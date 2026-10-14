@@ -1,5 +1,3 @@
-// src/engine/galaxyEngine.ts
-
 export const GRID_COLS = 6;
 export const GRID_ROWS = 10;
 export const PREVIEW_SIZE = 3;

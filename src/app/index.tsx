@@ -1,4 +1,3 @@
-// src/app/(tabs)/index.tsx (or src/app/index.tsx)
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,

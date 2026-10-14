@@ -1,4 +1,3 @@
-// src/engine/galaxyEngine.test.ts
 import {
   createEmptyGrid,
   createNewGameState,
