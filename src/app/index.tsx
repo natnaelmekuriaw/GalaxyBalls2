@@ -1,7 +1,11 @@
+// src/app/(tabs)/index.tsx
+import { useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Animated,
   AppState,
   Dimensions,
+  Easing,
   Modal,
   Platform,
   ScrollView,
@@ -19,7 +23,10 @@ import {
   GameMode,
   HighScoreEntry,
   MASCOTS,
+  MascotInfo,
+  MascotMood,
   PREVIEW_SIZE,
+  canPlacePiece,
   createNewGameState,
   getFallIntervalMs,
   getGhostY,
@@ -30,24 +37,185 @@ import {
 } from "../engine/galaxyEngine";
 import { runAllEngineTests } from "../engine/galaxyEngine.test";
 
-// Note: If you place this file directly inside `src/app/index.tsx` instead of `src/app/(tabs)/index.tsx`,
-// change `../../engine/galaxyEngine` above to `../engine/galaxyEngine`.
-
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const CELL_SIZE = Math.min(
-  Math.floor((SCREEN_WIDTH * 0.58) / GRID_COLS),
-  Math.floor((SCREEN_HEIGHT * 0.56) / GRID_ROWS)
-);
 
-const NORMAL_COLORS = [
-  { bg: "#FF4B5C", border: "#FF8A95", glyph: "●", name: "Ruby" },
-  { bg: "#00F5D4", border: "#80FFEC", glyph: "◆", name: "Cyan" },
-  { bg: "#FEE440", border: "#FFF29C", glyph: "▲", name: "Solar" },
-  { bg: "#9B5DE5", border: "#CBA4F5", glyph: "■", name: "Nova" },
-  { bg: "#00BBF9", border: "#8ADFFF", glyph: "✦", name: "Comet" },
+const CELL_SIZE = Math.min(
+  Math.floor((SCREEN_WIDTH * 0.63) / GRID_COLS),
+  Math.floor((SCREEN_HEIGHT * 0.64) / GRID_ROWS)
+);
+const PREVIEW_CELL_SIZE = Math.floor(CELL_SIZE * 0.72);
+
+const NORMAL_BLOCKS = [
+  {
+    name: "Blue",
+    outer: "#1565C0",
+    body: "#1E88E5",
+    highlight: "#90CAF9",
+    deep: "#0D47A1",
+    emblem: "🌊",
+    symbol: "◔",
+  },
+  {
+    name: "Green",
+    outer: "#1B5E20",
+    body: "#2E9E28",
+    highlight: "#A5D6A7",
+    deep: "#144718",
+    emblem: "🍀",
+    symbol: "●",
+  },
+  {
+    name: "Red",
+    outer: "#8E0000",
+    body: "#D32F2F",
+    highlight: "#EF9A9A",
+    deep: "#600000",
+    emblem: "🍁",
+    symbol: "✦",
+  },
+  {
+    name: "Gold",
+    outer: "#9A7D0A",
+    body: "#D4AC0D",
+    highlight: "#F9E79F",
+    deep: "#7D6608",
+    emblem: "☀️",
+    symbol: "◆",
+  },
+  {
+    name: "Purple",
+    outer: "#4A148C",
+    body: "#7B1FA2",
+    highlight: "#CE93D8",
+    deep: "#310B5E",
+    emblem: "🌀",
+    symbol: "✹",
+  },
 ];
 
+function UfoCompetitorAvatar({
+  mascot,
+  mood,
+  jumpAnim,
+}: {
+  mascot: MascotInfo;
+  mood: MascotMood;
+  jumpAnim: Animated.Value;
+}) {
+  return (
+    <View style={styles.ufoSceneContainer}>
+      <Text style={styles.ufoStars}>✦ · ✧</Text>
+      <View style={styles.bluePlanetHorizon}>
+        <View style={styles.bluePlanetGlow} />
+      </View>
+
+      <Animated.View
+        style={[
+          styles.ufoWrapper,
+          {
+            transform: [{ translateY: jumpAnim }],
+          },
+        ]}
+      >
+        <View style={styles.cockpitGlass} />
+        <View
+          style={[styles.creatureHead, { backgroundColor: mascot.furColor }]}
+        >
+          <View
+            style={[
+              styles.creatureEar,
+              styles.earLeft,
+              {
+                backgroundColor: mascot.furColor,
+                borderColor: mascot.earColor,
+              },
+            ]}
+          />
+          <View
+            style={[
+              styles.creatureEar,
+              styles.earRight,
+              {
+                backgroundColor: mascot.furColor,
+                borderColor: mascot.earColor,
+              },
+            ]}
+          />
+          {mascot.stripes && (
+            <View style={styles.stripeRow}>
+              <View style={styles.stripeBar} />
+              <View style={styles.stripeBar} />
+              <View style={styles.stripeBar} />
+            </View>
+          )}
+          <View style={styles.eyeRow}>
+            {mood === "HAPPY" || mood === "COMBO" ? (
+              <>
+                <Text style={styles.happyEyeArch}>^</Text>
+                <Text style={styles.happyEyeArch}>^</Text>
+              </>
+            ) : (
+              <>
+                <View
+                  style={[styles.eyeBall, { backgroundColor: mascot.eyeColor }]}
+                >
+                  <View style={styles.eyePupil} />
+                </View>
+                <View
+                  style={[styles.eyeBall, { backgroundColor: mascot.eyeColor }]}
+                >
+                  <View style={styles.eyePupil} />
+                </View>
+              </>
+            )}
+          </View>
+          <View style={styles.cheekRow}>
+            <View
+              style={[
+                styles.puffyCheek,
+                { backgroundColor: mascot.cheeksColor },
+              ]}
+            />
+            <View style={styles.noseMouthBox}>
+              <View style={styles.cuteNose} />
+              <View
+                style={[
+                  styles.cuteMouth,
+                  mood === "DANGER" && { borderRadius: 6, height: 6, width: 6 },
+                ]}
+              />
+            </View>
+            <View
+              style={[
+                styles.puffyCheek,
+                { backgroundColor: mascot.cheeksColor },
+              ]}
+            />
+          </View>
+        </View>
+        <View style={styles.saucerCollar} />
+        <View style={styles.saucerDiscOuter}>
+          <View style={styles.saucerDiscInner}>
+            <View style={styles.saucerLightDot} />
+            <View style={styles.saucerLightDot} />
+            <View style={styles.saucerLightDot} />
+          </View>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
 export default function OrbitBlocksApp() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({
+      tabBarStyle: { display: "none" },
+      headerShown: false,
+    });
+  }, [navigation]);
+
   const [screen, setScreen] = useState<
     "TITLE" | "GAME" | "HIGHSCORES" | "HOWTO" | "SETTINGS"
   >("TITLE");
@@ -56,7 +224,10 @@ export default function OrbitBlocksApp() {
   );
   const [, setTickCount] = useState(0);
 
-  // Settings & Accessibility state
+  const animX = useRef(new Animated.Value(2 * CELL_SIZE)).current;
+  const animY = useRef(new Animated.Value(0)).current;
+  const mascotJumpAnim = useRef(new Animated.Value(0)).current;
+
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
@@ -65,18 +236,17 @@ export default function OrbitBlocksApp() {
   >("GEOMETRY_90");
   const [experimental4Block, setExperimental4Block] = useState(false);
 
-  // Local Top 5 High Scores per mode
   const [highScores, setHighScores] = useState<
     Record<GameMode, HighScoreEntry[]>
   >({
     CLASSIC: [
-      { alias: "NOK", score: 1250, level: 5, date: "2026-10-14" },
-      { alias: "ORB", score: 840, level: 4, date: "2026-10-14" },
-      { alias: "GAL", score: 520, level: 3, date: "2026-10-14" },
+      { alias: "NOK", score: 90, level: 1, date: "2026-10-14" },
+      { alias: "ORB", score: 60, level: 1, date: "2026-10-14" },
+      { alias: "GAL", score: 30, level: 1, date: "2026-10-14" },
     ],
     COMFORT: [
-      { alias: "MOD", score: 1480, level: 6, date: "2026-10-14" },
-      { alias: "ZEN", score: 910, level: 4, date: "2026-10-14" },
+      { alias: "MOD", score: 180, level: 2, date: "2026-10-14" },
+      { alias: "ZEN", score: 90, level: 1, date: "2026-10-14" },
     ],
     PRACTICE: [],
   });
@@ -87,6 +257,27 @@ export default function OrbitBlocksApp() {
   stateRef.current = gameState;
 
   const forceRender = useCallback(() => setTickCount((t) => t + 1), []);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(mascotJumpAnim, {
+          toValue: -9,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(mascotJumpAnim, {
+          toValue: 3,
+          duration: 850,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [mascotJumpAnim]);
 
   const triggerHaptic = useCallback(
     (ms = 25) => {
@@ -118,7 +309,38 @@ export default function OrbitBlocksApp() {
     []
   );
 
-  // Auto-pause when app goes to background
+  const syncSmoothPieceAnimation = useCallback(
+    (s: EngineState, immediateX = false) => {
+      const p = s.activePiece;
+      if (!p || s.status !== "PLAYING") return;
+
+      const intervalMs = getFallIntervalMs(s.config, s.level);
+
+      if (immediateX) {
+        animX.setValue(p.x * CELL_SIZE);
+      } else {
+        Animated.timing(animX, {
+          toValue: p.x * CELL_SIZE,
+          duration: 85,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }).start();
+      }
+
+      animY.stopAnimation();
+      animY.setValue(p.y * CELL_SIZE);
+      if (canPlacePiece(s.grid, p, p.x, p.y + 1)) {
+        Animated.timing(animY, {
+          toValue: (p.y + 1) * CELL_SIZE,
+          duration: intervalMs,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+    [animX, animY]
+  );
+
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState !== "active" && stateRef.current.status === "PLAYING") {
@@ -129,33 +351,39 @@ export default function OrbitBlocksApp() {
     return () => sub.remove();
   }, [forceRender]);
 
-  // Core gravity loop
   useEffect(() => {
     if (screen !== "GAME" || gameState.status !== "PLAYING") return;
     const intervalMs = getFallIntervalMs(gameState.config, gameState.level);
 
+    syncSmoothPieceAnimation(stateRef.current, true);
+
     const timer = setInterval(() => {
       const s = stateRef.current;
       if (s.status !== "PLAYING") return;
+      const prevPiece = s.activePiece;
       const summary = stepGravityTick(s);
+
       if (summary) {
         if (summary.stoneLanded) triggerHaptic(65);
         if (summary.specialTriggered) {
           setBannerText(`${summary.specialTriggered} BLAST!`);
           triggerHaptic(50);
         } else if (summary.chainDepth >= 2) {
-          setBannerText(`${summary.chainDepth}x CASCADE COMBO!`);
+          setBannerText(`${summary.chainDepth}x CASCADE!`);
           triggerHaptic(40);
         } else if (summary.levelUp) {
           setBannerText(`LEVEL ${s.level}!`);
         } else if (summary.clearedCount > 0) {
-          setBannerText(`+${summary.scoreDelta} PTS`);
+          setBannerText(`+${summary.scoreDelta}`);
           triggerHaptic(20);
         }
         if (summary.gameOver) {
           recordHighScore(s.config.mode, s.score, s.level);
         }
       }
+
+      const spawnedNew = prevPiece !== s.activePiece && s.activePiece?.y === 0;
+      syncSmoothPieceAnimation(s, spawnedNew);
       forceRender();
     }, intervalMs);
 
@@ -168,38 +396,14 @@ export default function OrbitBlocksApp() {
     forceRender,
     triggerHaptic,
     recordHighScore,
+    syncSmoothPieceAnimation,
   ]);
 
-  // Clear temporary banner message
   useEffect(() => {
     if (!bannerText) return;
-    const t = setTimeout(() => setBannerText(null), 1100);
+    const t = setTimeout(() => setBannerText(null), 1000);
     return () => clearTimeout(t);
   }, [bannerText]);
-
-  // Web keyboard support for desktop testing
-  useEffect(() => {
-    if (Platform.OS !== "web" || screen !== "GAME") return;
-    const handleKeyDown = (e: any) => {
-      const s = stateRef.current;
-      if (s.status !== "PLAYING") return;
-      if (e.key === "ArrowLeft" || e.key === "4") {
-        movePiece(s, -1, 0);
-        forceRender();
-      } else if (e.key === "ArrowRight" || e.key === "6") {
-        movePiece(s, 1, 0);
-        forceRender();
-      } else if (e.key === "ArrowUp" || e.key === "2") {
-        rotateActivePiece(s);
-        forceRender();
-      } else if (e.key === "ArrowDown" || e.key === "5" || e.key === "8") {
-        stepGravityTick(s);
-        forceRender();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [screen, forceRender]);
 
   const startNewGame = (mode: GameMode) => {
     const fresh = createNewGameState(mode, {
@@ -207,13 +411,22 @@ export default function OrbitBlocksApp() {
       experimentalFourBlockPieces: experimental4Block,
     });
     setGameState(fresh);
-    setBannerText(`${mode} MODE`);
+    if (fresh.activePiece) {
+      animX.setValue(fresh.activePiece.x * CELL_SIZE);
+      animY.setValue(fresh.activePiece.y * CELL_SIZE);
+    }
     setScreen("GAME");
   };
 
   const handleMoveLeft = () => {
     if (movePiece(gameState, -1, 0)) {
       triggerHaptic(10);
+      Animated.timing(animX, {
+        toValue: gameState.activePiece!.x * CELL_SIZE,
+        duration: 80,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
       forceRender();
     }
   };
@@ -221,6 +434,12 @@ export default function OrbitBlocksApp() {
   const handleMoveRight = () => {
     if (movePiece(gameState, 1, 0)) {
       triggerHaptic(10);
+      Animated.timing(animX, {
+        toValue: gameState.activePiece!.x * CELL_SIZE,
+        duration: 80,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
       forceRender();
     }
   };
@@ -228,16 +447,23 @@ export default function OrbitBlocksApp() {
   const handleRotate = () => {
     if (rotateActivePiece(gameState)) {
       triggerHaptic(15);
+      Animated.timing(animX, {
+        toValue: gameState.activePiece!.x * CELL_SIZE,
+        duration: 60,
+        useNativeDriver: true,
+      }).start();
       forceRender();
     }
   };
 
   const handleSoftDrop = () => {
-    const summary = stepGravityTick(gameState);
+    const s = gameState;
+    const summary = stepGravityTick(s);
     if (summary?.gameOver) {
-      recordHighScore(gameState.config.mode, gameState.score, gameState.level);
+      recordHighScore(s.config.mode, s.score, s.level);
     }
-    triggerHaptic(12);
+    syncSmoothPieceAnimation(s, summary !== null);
+    triggerHaptic(10);
     forceRender();
   };
 
@@ -248,141 +474,161 @@ export default function OrbitBlocksApp() {
     if (summary.gameOver) {
       recordHighScore(gameState.config.mode, gameState.score, gameState.level);
     }
+    syncSmoothPieceAnimation(gameState, true);
     triggerHaptic(45);
     forceRender();
   };
 
-  const renderCellContent = (cell: Cell, isGhost = false) => {
+  const renderBlockTile = (cell: Cell, size: number, isGhost = false) => {
     if (cell.kind === "EMPTY") return null;
 
     if (cell.kind === "STONE") {
       return (
-        <View style={[styles.cellInner, styles.stoneCell]}>
-          <Text style={styles.stoneGlyph}>▣</Text>
-        </View>
-      );
-    }
-    if (cell.kind === "BOMB") {
-      return (
-        <View style={[styles.cellInner, styles.bombCell]}>
-          <Text style={styles.specialGlyph}>💣</Text>
-        </View>
-      );
-    }
-    if (cell.kind === "FLASH") {
-      return (
-        <View style={[styles.cellInner, styles.flashCell]}>
-          <Text style={styles.specialGlyph}>⚡</Text>
-        </View>
-      );
-    }
-    if (cell.kind === "STAR") {
-      return (
-        <View style={[styles.cellInner, styles.starCell]}>
-          <Text style={styles.specialGlyph}>⭐</Text>
+        <View
+          style={[
+            styles.cushionOuter,
+            styles.stoneOuter,
+            { width: size - 2, height: size - 2 },
+          ]}
+        >
+          <View style={styles.stoneInner}>
+            <View style={styles.shineCorner} />
+            <Text style={[styles.emblemText, { fontSize: size * 0.42 }]}>
+              🪨
+            </Text>
+          </View>
         </View>
       );
     }
 
-    const palette = NORMAL_COLORS[(cell.colorId ?? 0) % NORMAL_COLORS.length];
+    if (cell.kind === "BOMB" || cell.kind === "FLASH" || cell.kind === "STAR") {
+      const bg =
+        cell.kind === "BOMB"
+          ? "#D84315"
+          : cell.kind === "FLASH"
+          ? "#00838F"
+          : "#F57F17";
+      const icon =
+        cell.kind === "BOMB" ? "💣" : cell.kind === "FLASH" ? "⚡" : "⭐";
+      return (
+        <View
+          style={[
+            styles.cushionOuter,
+            {
+              width: size - 2,
+              height: size - 2,
+              backgroundColor: bg,
+              borderColor: "#FFF59D",
+            },
+          ]}
+        >
+          <View style={styles.shineCorner} />
+          <Text style={{ fontSize: size * 0.48 }}>{icon}</Text>
+        </View>
+      );
+    }
+
+    const theme = NORMAL_BLOCKS[(cell.colorId ?? 0) % NORMAL_BLOCKS.length];
     return (
       <View
         style={[
-          styles.cellInner,
+          styles.cushionOuter,
           {
-            backgroundColor: isGhost ? "transparent" : palette.bg,
-            borderColor: palette.border,
-            borderWidth: isGhost ? 2 : 2,
-            opacity: isGhost ? 0.45 : 1,
+            width: size - 2,
+            height: size - 2,
+            backgroundColor: isGhost ? "transparent" : theme.outer,
+            borderTopColor: theme.highlight,
+            borderLeftColor: theme.highlight,
+            borderRightColor: theme.deep,
+            borderBottomColor: theme.deep,
+            opacity: isGhost ? 0.38 : 1,
           },
         ]}
       >
-        {colorblindGlyphs && (
-          <Text style={styles.normalGlyph}>{palette.glyph}</Text>
-        )}
+        <View
+          style={[
+            styles.cushionBody,
+            { backgroundColor: isGhost ? "transparent" : theme.body },
+          ]}
+        >
+          {!isGhost && <View style={styles.shineCorner} />}
+          <View
+            style={[styles.innerEmblemWell, { backgroundColor: theme.deep }]}
+          >
+            <Text
+              style={[
+                styles.emblemSymbol,
+                { color: theme.highlight, fontSize: size * 0.34 },
+              ]}
+            >
+              {colorblindGlyphs ? theme.symbol : "•"}
+            </Text>
+          </View>
+        </View>
       </View>
     );
   };
 
-  // ==================== 1. TITLE & MAIN MENU SCREEN ====================
   if (screen === "TITLE") {
+    const heroMascot = MASCOTS[0];
     return (
       <View style={styles.titleContainer}>
-        {/* Twinkling Stars & 3 Retro Planets */}
-        <View style={styles.planetOne} />
-        <View style={styles.planetTwo} />
-        <View style={styles.planetThree} />
-        <Text style={styles.starField}>✦ · ✧ ★ · ✦ ·</Text>
-
-        {/* Animated Yellow Flying Mascot Hero */}
-        <View style={styles.heroMascotBadge}>
-          <Text style={styles.heroMascotEmoji}>🐝</Text>
-          <Text style={styles.heroMascotHint}>Lumibee Ready!</Text>
+        <Text style={styles.starScatterTop}>· ✦ * · ✧ · *</Text>
+        <View style={styles.logoStack}>
+          <Text style={styles.logoGalaxy}>Galaxy</Text>
+          <View style={styles.logoSwoosh} />
+          <Text style={styles.logoBalls}>Balls</Text>
         </View>
-
-        <Text style={styles.gameTitle}>ORBIT BLOCKS</Text>
-        <Text style={styles.gameSubtitle}>RETRO GALAXY REMAKE</Text>
-
+        <View style={styles.titleCenterpiece}>
+          <View style={styles.titlePlanetPurple} />
+          <View style={styles.titlePlanetIce} />
+          <View style={styles.titlePlanetOrange} />
+          <View style={{ marginBottom: 24 }}>
+            <UfoCompetitorAvatar
+              mascot={heroMascot}
+              mood="HAPPY"
+              jumpAnim={mascotJumpAnim}
+            />
+          </View>
+        </View>
         <View style={styles.menuButtonList}>
           <TouchableOpacity
-            style={styles.primaryMenuBtn}
+            style={styles.goldMenuBtn}
             onPress={() => startNewGame("CLASSIC")}
           >
-            <Text style={styles.primaryMenuBtnText}>▶ PLAY CLASSIC (6×10)</Text>
-            <Text style={styles.menuBtnSub}>
-              Authentic Nokia 2330 rules & pacing
-            </Text>
+            <Text style={styles.goldMenuBtnText}>▶ PLAY CLASSIC (6×10)</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={styles.secondaryMenuBtn}
+            style={styles.darkMenuBtn}
             onPress={() => startNewGame("COMFORT")}
           >
-            <Text style={styles.secondaryMenuBtnText}>
-              ⚡ PLAY MODERN COMFORT
-            </Text>
-            <Text style={styles.menuBtnSub}>
-              Ghost piece, hard drop & brisk speed
-            </Text>
+            <Text style={styles.darkMenuBtnText}>⚡ MODERN COMFORT MODE</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryMenuBtn}
-            onPress={() => startNewGame("PRACTICE")}
-          >
-            <Text style={styles.secondaryMenuBtnText}>🎓 PRACTICE MODE</Text>
-            <Text style={styles.menuBtnSub}>
-              Relaxed speed, unranked sandbox
-            </Text>
-          </TouchableOpacity>
-
           <View style={styles.menuRow}>
             <TouchableOpacity
               style={styles.halfBtn}
               onPress={() => setScreen("HOWTO")}
             >
-              <Text style={styles.halfBtnText}>📖 HOW TO PLAY</Text>
+              <Text style={styles.halfBtnText}>📖 RULES</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.halfBtn}
               onPress={() => setScreen("HIGHSCORES")}
             >
-              <Text style={styles.halfBtnText}>🏆 TOP 5 SCORES</Text>
+              <Text style={styles.halfBtnText}>🏆 TOP 5</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.halfBtn}
+              onPress={() => setScreen("SETTINGS")}
+            >
+              <Text style={styles.halfBtnText}>⚙️ SETUP</Text>
             </TouchableOpacity>
           </View>
-
-          <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => setScreen("SETTINGS")}
-          >
-            <Text style={styles.halfBtnText}>⚙️ SETTINGS & ENGINE TESTS</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // ==================== 2. HOW TO PLAY / TUTORIAL ====================
   if (screen === "HOWTO") {
     return (
       <ScrollView
@@ -391,49 +637,38 @@ export default function OrbitBlocksApp() {
       >
         <Text style={styles.sectionHeader}>📖 HOW TO PLAY</Text>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>
-            1. 4-Axis Match-Three (Not Tetris!)
-          </Text>
+          <Text style={styles.infoTitle}>1. 4-Axis Match-Three</Text>
           <Text style={styles.infoBody}>
-            Align 3 or more blocks of the SAME normal color horizontally,
-            vertically, or diagonally (both slopes). Full rows do not clear
-            unless colors match!
+            Connect 3 or more blocks of the SAME color horizontally, vertically,
+            or diagonally. Full rows do not clear unless colors match!
           </Text>
         </View>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>2. Heavy Stones (▣)</Text>
+          <Text style={styles.infoTitle}>2. Stones & Special Blocks</Text>
           <Text style={styles.infoBody}>
-            Dark heavy Stones are obstacles. Connecting 3 Stones will NOT clear
-            them! Destroy them using a Bomb or a Flash.
-          </Text>
-        </View>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>3. Special Single-Cell Pieces</Text>
-          <Text style={styles.infoBody}>
-            • 💣 BOMB: Destroys the surrounding 3×3 area on impact (including
-            Stones).{"\n"}• ⚡ FLASH: Zaps the entire vertical column it lands
-            in (including Stones).{"\n"}• ⭐ STAR: Removes all blocks of the
-            normal color it touches across the board.
+            • 🪨 STONE: Heavy dark obstacle. Cannot be matched—clear with Bomb
+            or Flash!{"\n"}• 💣 BOMB: Destroys surrounding 3×3 blocks on impact.
+            {"\n"}• ⚡ FLASH: Clears the entire vertical column.{"\n"}• ⭐ STAR:
+            Clears all normal blocks of the color it lands on.
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.primaryMenuBtn}
+          style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.primaryMenuBtnText}>◀ BACK TO MENU</Text>
+          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
         </TouchableOpacity>
       </ScrollView>
     );
   }
 
-  // ==================== 3. HIGH SCORES SCREEN ====================
   if (screen === "HIGHSCORES") {
     return (
       <ScrollView
         style={styles.modalScreen}
         contentContainerStyle={styles.modalContent}
       >
-        <Text style={styles.sectionHeader}>🏆 TOP 5 LOCAL HIGH SCORES</Text>
+        <Text style={styles.sectionHeader}>🏆 TOP 5 HIGH SCORES</Text>
         {(["CLASSIC", "COMFORT"] as GameMode[]).map((mode) => (
           <View key={mode} style={styles.infoCard}>
             <Text style={styles.infoTitle}>{mode} MODE</Text>
@@ -450,24 +685,22 @@ export default function OrbitBlocksApp() {
           </View>
         ))}
         <TouchableOpacity
-          style={styles.primaryMenuBtn}
+          style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.primaryMenuBtnText}>◀ BACK TO MENU</Text>
+          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
         </TouchableOpacity>
       </ScrollView>
     );
   }
 
-  // ==================== 4. SETTINGS & DIAGNOSTICS ====================
   if (screen === "SETTINGS") {
     return (
       <ScrollView
         style={styles.modalScreen}
         contentContainerStyle={styles.modalContent}
       >
-        <Text style={styles.sectionHeader}>⚙️ SETTINGS & QA</Text>
-
+        <Text style={styles.sectionHeader}>⚙️ SETTINGS & TESTS</Text>
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => setHapticsEnabled(!hapticsEnabled)}
@@ -477,25 +710,15 @@ export default function OrbitBlocksApp() {
             {hapticsEnabled ? "ON" : "OFF"}
           </Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => setColorblindGlyphs(!colorblindGlyphs)}
         >
-          <Text style={styles.toggleLabel}>Colorblind Tile Symbols</Text>
+          <Text style={styles.toggleLabel}>Inner Block Emblems</Text>
           <Text style={styles.toggleValue}>
             {colorblindGlyphs ? "ON" : "OFF"}
           </Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.toggleRow}
-          onPress={() => setHighContrast(!highContrast)}
-        >
-          <Text style={styles.toggleLabel}>High Contrast Grid Borders</Text>
-          <Text style={styles.toggleValue}>{highContrast ? "ON" : "OFF"}</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() =>
@@ -504,32 +727,18 @@ export default function OrbitBlocksApp() {
             )
           }
         >
-          <Text style={styles.toggleLabel}>Rotation Strategy</Text>
+          <Text style={styles.toggleLabel}>Rotation Mode</Text>
           <Text style={styles.toggleValue}>{rotationStrategy}</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={styles.toggleRow}
-          onPress={() => setExperimental4Block(!experimental4Block)}
-        >
-          <Text style={styles.toggleLabel}>Experimental 4-Block Pieces</Text>
-          <Text style={styles.toggleValue}>
-            {experimental4Block ? "ENABLED" : "OFF"}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.secondaryMenuBtn, { marginTop: 14 }]}
+          style={styles.darkMenuBtn}
           onPress={() => {
             const res = runAllEngineTests();
             setTestReport(res.log);
           }}
         >
-          <Text style={styles.secondaryMenuBtnText}>
-            🧪 RUN MANDATORY ENGINE UNIT TESTS
-          </Text>
+          <Text style={styles.darkMenuBtnText}>🧪 RUN ENGINE UNIT TESTS</Text>
         </TouchableOpacity>
-
         {testReport && (
           <View style={styles.infoCard}>
             {testReport.map((line, idx) => (
@@ -539,153 +748,190 @@ export default function OrbitBlocksApp() {
             ))}
           </View>
         )}
-
         <TouchableOpacity
-          style={styles.primaryMenuBtn}
+          style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.primaryMenuBtnText}>◀ BACK TO MENU</Text>
+          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
         </TouchableOpacity>
       </ScrollView>
     );
   }
 
-  // ==================== 5. MAIN PLAY SCREEN ====================
   const mascot = MASCOTS[gameState.mascotIndex] || MASCOTS[0];
+  const modeHighList = highScores[gameState.config.mode] || [];
+  const topHighScore = Math.max(
+    gameState.score,
+    modeHighList.length > 0 ? modeHighList[0].score : 90
+  );
   const ghostY =
     gameState.config.showGhostPiece && gameState.activePiece
       ? getGhostY(gameState.grid, gameState.activePiece)
       : null;
 
   return (
-    <View style={styles.playContainer}>
-      {/* Top Status Bar */}
-      <View style={styles.topHud}>
-        <View>
-          <Text style={styles.hudLabel}>{gameState.config.mode}</Text>
-          <Text style={styles.hudScore}>{gameState.score}</Text>
-        </View>
-        <View style={styles.hudCenter}>
-          <Text style={styles.hudLevel}>LEVEL {gameState.level}</Text>
-          {bannerText && <Text style={styles.bannerPill}>{bannerText}</Text>}
-        </View>
+    <View style={styles.playScreen}>
+      <View style={styles.orangeScoreHeader}>
+        <Text style={styles.orangeHeaderText}>
+          Score {gameState.score} High {topHighScore}
+        </Text>
         <TouchableOpacity
-          style={styles.pauseBtn}
+          style={styles.headerPausePill}
           onPress={() => {
             gameState.status =
               gameState.status === "PAUSED" ? "PLAYING" : "PAUSED";
             forceRender();
           }}
         >
-          <Text style={styles.pauseBtnText}>
+          <Text style={styles.headerPauseText}>
             {gameState.status === "PAUSED" ? "▶" : "❚❚"}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Center Stage: 6x10 Grid on Left + 3x3 Preview & Flying Mascot on Right */}
-      <View style={styles.middleStage}>
-        {/* 6x10 Board */}
-        <View
-          style={[
-            styles.boardFrame,
-            highContrast && { borderColor: "#FFFFFF", borderWidth: 3 },
-          ]}
-        >
-          {Array.from({ length: GRID_ROWS }).map((_, r) => (
-            <View key={r} style={styles.boardRow}>
-              {Array.from({ length: GRID_COLS }).map((__, c) => {
-                let cellToRender: Cell = gameState.grid[r][c];
-                let isGhostCell = false;
+      <View style={styles.spaceSkyBanner}>
+        <Text style={styles.spaceSkyStars}>
+          ✦ * · ★ {bannerText || `LV.${gameState.level}`} · ✦
+        </Text>
+      </View>
 
-                if (gameState.activePiece) {
-                  for (const part of gameState.activePiece.cells) {
-                    if (
-                      gameState.activePiece.y + part.dy === r &&
-                      gameState.activePiece.x + part.dx === c
-                    ) {
-                      cellToRender = { kind: part.kind, colorId: part.colorId };
-                    } else if (
-                      ghostY !== null &&
-                      cellToRender.kind === "EMPTY" &&
-                      ghostY + part.dy === r &&
-                      gameState.activePiece.x + part.dx === c
-                    ) {
-                      cellToRender = { kind: part.kind, colorId: part.colorId };
-                      isGhostCell = true;
+      <View style={styles.arenaRow}>
+        <View style={styles.goldenBoardFrame}>
+          <View style={styles.boardInnerGrid}>
+            {Array.from({ length: GRID_ROWS }).map((_, r) => (
+              <View key={r} style={styles.boardRow}>
+                {Array.from({ length: GRID_COLS }).map((__, c) => {
+                  const settledCell = gameState.grid[r][c];
+                  let ghostCell: Cell | null = null;
+
+                  if (
+                    settledCell.kind === "EMPTY" &&
+                    ghostY !== null &&
+                    gameState.activePiece
+                  ) {
+                    for (const part of gameState.activePiece.cells) {
+                      if (
+                        ghostY + part.dy === r &&
+                        gameState.activePiece.x + part.dx === c
+                      ) {
+                        ghostCell = { kind: part.kind, colorId: part.colorId };
+                      }
                     }
                   }
-                }
 
-                return (
-                  <View
-                    key={c}
-                    style={[
-                      styles.gridCell,
-                      { width: CELL_SIZE, height: CELL_SIZE },
-                      highContrast && { borderColor: "#3A4750" },
-                    ]}
-                  >
-                    {renderCellContent(cellToRender, isGhostCell)}
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
-
-        {/* Right Side Panel: 3x3 Next Preview & Reactive Mascot */}
-        <View style={styles.sidePanel}>
-          <Text style={styles.sideTitle}>NEXT (3×3)</Text>
-          <View style={styles.previewBox}>
-            {Array.from({ length: PREVIEW_SIZE }).map((_, pr) => (
-              <View key={pr} style={styles.boardRow}>
-                {Array.from({ length: PREVIEW_SIZE }).map((__, pc) => {
-                  const found = gameState.nextPiece.cells.find(
-                    (part) => part.dy === pr && part.dx === pc
-                  );
-                  const previewCell: Cell = found
-                    ? { kind: found.kind, colorId: found.colorId }
-                    : { kind: "EMPTY" };
                   return (
-                    <View key={pc} style={styles.previewCell}>
-                      {renderCellContent(previewCell)}
+                    <View
+                      key={c}
+                      style={[
+                        styles.iceGridCell,
+                        { width: CELL_SIZE, height: CELL_SIZE },
+                        highContrast && {
+                          borderColor: "#5C9EAD",
+                          borderWidth: 1,
+                        },
+                      ]}
+                    >
+                      {settledCell.kind !== "EMPTY"
+                        ? renderBlockTile(settledCell, CELL_SIZE, false)
+                        : ghostCell
+                        ? renderBlockTile(ghostCell, CELL_SIZE, true)
+                        : null}
                     </View>
                   );
                 })}
               </View>
             ))}
+
+            {gameState.activePiece && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  styles.activePieceOverlay,
+                  {
+                    transform: [{ translateX: animX }, { translateY: animY }],
+                  },
+                ]}
+              >
+                {gameState.activePiece.cells.map((part, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      position: "absolute",
+                      left: part.dx * CELL_SIZE,
+                      top: part.dy * CELL_SIZE,
+                      width: CELL_SIZE,
+                      height: CELL_SIZE,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {renderBlockTile(
+                      { kind: part.kind, colorId: part.colorId },
+                      CELL_SIZE,
+                      false
+                    )}
+                  </View>
+                ))}
+              </Animated.View>
+            )}
+          </View>
+        </View>
+
+        <View style={styles.rightColumn}>
+          <View style={styles.previewWithBridgeRow}>
+            <View style={styles.goldenBridgeTab} />
+            <View style={styles.goldenPreviewFrame}>
+              <View style={styles.creamPreviewInner}>
+                {Array.from({ length: PREVIEW_SIZE }).map((_, pr) => (
+                  <View key={pr} style={styles.boardRow}>
+                    {Array.from({ length: PREVIEW_SIZE }).map((__, pc) => {
+                      const found =
+                        gameState.nextPiece.cells.find(
+                          (part) => part.dy + 1 === pr && part.dx === pc
+                        ) ||
+                        gameState.nextPiece.cells.find(
+                          (part) => part.dy === pr && part.dx === pc
+                        );
+                      const previewCell: Cell = found
+                        ? { kind: found.kind, colorId: found.colorId }
+                        : { kind: "EMPTY" };
+
+                      return (
+                        <View
+                          key={pc}
+                          style={[
+                            styles.creamPreviewCell,
+                            {
+                              width: PREVIEW_CELL_SIZE,
+                              height: PREVIEW_CELL_SIZE,
+                            },
+                          ]}
+                        >
+                          {renderBlockTile(
+                            previewCell,
+                            PREVIEW_CELL_SIZE,
+                            false
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
+              </View>
+            </View>
           </View>
 
-          {/* Reactive Flying Space Mascot */}
-          <View
-            style={[styles.mascotBox, { borderColor: mascot.primaryColor }]}
-          >
-            <Text style={styles.mascotName}>{mascot.name}</Text>
-            <Text style={styles.mascotAvatar}>{mascot.symbol}</Text>
-            <Text
-              style={[styles.mascotExpression, { color: mascot.primaryColor }]}
-            >
-              {gameState.mascotMood === "HAPPY" && "^‿^ Nice!"}
-              {gameState.mascotMood === "COMBO" && "★O★ COMBO!"}
-              {gameState.mascotMood === "DANGER" && "⊙﹏⊙ Careful!"}
-              {gameState.mascotMood === "TRANSITION" && "🚀 Level Up!"}
-              {gameState.mascotMood === "IDLE" && "•‿• Hovering"}
-            </Text>
-          </View>
-
-          <View style={styles.statsBox}>
-            <Text style={styles.statLine}>
-              Cleared: {gameState.linesOrMatchesCleared}
-            </Text>
-            <Text style={styles.statLine}>
-              Chain: {gameState.lastChainDepth}x
-            </Text>
+          <View style={styles.competitorStage}>
+            <UfoCompetitorAvatar
+              mascot={mascot}
+              mood={gameState.mascotMood}
+              jumpAnim={mascotJumpAnim}
+            />
+            <Text style={styles.pilotNameTag}>{mascot.name}</Text>
           </View>
         </View>
       </View>
 
-      {/* Bottom Ergonomic Thumb Control Strip */}
       <View style={styles.controlStrip}>
         <TouchableOpacity
           style={styles.ctrlBtn}
@@ -695,7 +941,6 @@ export default function OrbitBlocksApp() {
           <Text style={styles.ctrlBtnText}>◀</Text>
           <Text style={styles.ctrlSubLabel}>LEFT</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.ctrlBtn}
           activeOpacity={0.65}
@@ -704,7 +949,6 @@ export default function OrbitBlocksApp() {
           <Text style={styles.ctrlBtnText}>↻</Text>
           <Text style={styles.ctrlSubLabel}>ROTATE</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.ctrlBtn}
           activeOpacity={0.65}
@@ -713,7 +957,6 @@ export default function OrbitBlocksApp() {
           <Text style={styles.ctrlBtnText}>▼</Text>
           <Text style={styles.ctrlSubLabel}>DOWN</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.ctrlBtn}
           activeOpacity={0.65}
@@ -722,7 +965,6 @@ export default function OrbitBlocksApp() {
           <Text style={styles.ctrlBtnText}>▶</Text>
           <Text style={styles.ctrlSubLabel}>RIGHT</Text>
         </TouchableOpacity>
-
         {gameState.config.allowHardDrop && (
           <TouchableOpacity
             style={[styles.ctrlBtn, styles.hardDropBtn]}
@@ -735,7 +977,6 @@ export default function OrbitBlocksApp() {
         )}
       </View>
 
-      {/* Pause & Game Over Modal Overlay */}
       <Modal
         visible={
           gameState.status === "PAUSED" || gameState.status === "GAME_OVER"
@@ -746,38 +987,34 @@ export default function OrbitBlocksApp() {
         <View style={styles.overlayBackdrop}>
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>
-              {gameState.status === "GAME_OVER"
-                ? "💥 TOP OUT — GAME OVER"
-                : "⏸ GAME PAUSED"}
+              {gameState.status === "GAME_OVER" ? "GAME OVER" : "PAUSED"}
             </Text>
             <Text style={styles.overlayScore}>
-              Score: {gameState.score} | Level: {gameState.level}
+              Score: {gameState.score} | High: {topHighScore}
             </Text>
-
             {gameState.status === "PAUSED" ? (
               <TouchableOpacity
-                style={styles.primaryMenuBtn}
+                style={styles.goldMenuBtn}
                 onPress={() => {
                   gameState.status = "PLAYING";
                   forceRender();
                 }}
               >
-                <Text style={styles.primaryMenuBtnText}>▶ RESUME</Text>
+                <Text style={styles.goldMenuBtnText}>▶ RESUME</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={styles.primaryMenuBtn}
+                style={styles.goldMenuBtn}
                 onPress={() => startNewGame(gameState.config.mode)}
               >
-                <Text style={styles.primaryMenuBtnText}>🔄 PLAY AGAIN</Text>
+                <Text style={styles.goldMenuBtnText}>🔄 PLAY AGAIN</Text>
               </TouchableOpacity>
             )}
-
             <TouchableOpacity
-              style={styles.secondaryMenuBtn}
+              style={styles.darkMenuBtn}
               onPress={() => setScreen("TITLE")}
             >
-              <Text style={styles.secondaryMenuBtnText}>🏠 MAIN MENU</Text>
+              <Text style={styles.darkMenuBtnText}>🏠 TITLE SCREEN</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -789,355 +1026,544 @@ export default function OrbitBlocksApp() {
 const styles = StyleSheet.create({
   titleContainer: {
     flex: 1,
-    backgroundColor: "#070916",
+    backgroundColor: "#020412",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 48,
+    paddingHorizontal: 22,
+  },
+  starScatterTop: {
+    color: "#CBD5E1",
+    fontSize: 14,
+    letterSpacing: 4,
+  },
+  logoStack: {
+    alignItems: "center",
+    marginTop: 6,
+  },
+  logoGalaxy: {
+    color: "#FFFFFF",
+    fontSize: 44,
+    fontWeight: "900",
+    letterSpacing: 2,
+    textShadowColor: "#3B82F6",
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 8,
+  },
+  logoSwoosh: {
+    width: 140,
+    height: 6,
+    backgroundColor: "#60A5FA",
+    borderRadius: 4,
+    marginVertical: 2,
+  },
+  logoBalls: {
+    color: "#FFFFFF",
+    fontSize: 40,
+    fontWeight: "900",
+    letterSpacing: 3,
+    marginLeft: 36,
+    textShadowColor: "#2563EB",
+    textShadowOffset: { width: 0, height: 3 },
+    textShadowRadius: 8,
+  },
+  titleCenterpiece: {
+    width: 260,
+    height: 210,
     alignItems: "center",
     justifyContent: "center",
-    padding: 24,
   },
-  planetOne: {
+  titlePlanetPurple: {
     position: "absolute",
-    top: 60,
-    left: 34,
+    left: 10,
+    bottom: 42,
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#FF6B6B",
+    backgroundColor: "#4C1D95",
     borderWidth: 3,
-    borderColor: "#FFA8A8",
-    opacity: 0.85,
+    borderColor: "#7C3AED",
   },
-  planetTwo: {
+  titlePlanetOrange: {
     position: "absolute",
-    top: 95,
-    right: 40,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "#4EA8DE",
-    borderWidth: 2,
-    borderColor: "#90E0EF",
-    opacity: 0.85,
+    right: 8,
+    bottom: 28,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    backgroundColor: "#EA580C",
+    borderWidth: 3,
+    borderColor: "#FDBA74",
   },
-  planetThree: {
+  titlePlanetIce: {
     position: "absolute",
-    top: 42,
-    right: 120,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: "#9B5DE5",
-    opacity: 0.8,
-  },
-  starField: {
-    color: "#FFF3B0",
-    fontSize: 16,
-    letterSpacing: 3,
-    marginBottom: 12,
-  },
-  heroMascotBadge: {
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  heroMascotEmoji: {
-    fontSize: 46,
-  },
-  heroMascotHint: {
-    color: "#FFD166",
-    fontSize: 12,
-    fontWeight: "bold",
-    marginTop: 2,
-  },
-  gameTitle: {
-    fontSize: 34,
-    fontWeight: "900",
-    color: "#66FCF1",
-    letterSpacing: 2,
-  },
-  gameSubtitle: {
-    fontSize: 13,
-    color: "#FFD166",
-    letterSpacing: 3,
-    marginBottom: 24,
-    fontWeight: "700",
+    bottom: 10,
+    width: 130,
+    height: 72,
+    borderTopLeftRadius: 70,
+    borderTopRightRadius: 70,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    backgroundColor: "#F8FAFC",
+    borderWidth: 4,
+    borderColor: "#93C5FD",
   },
   menuButtonList: {
     width: "100%",
     maxWidth: 340,
     gap: 10,
   },
-  primaryMenuBtn: {
-    backgroundColor: "#66FCF1",
+  goldMenuBtn: {
+    backgroundColor: "#F59B1A",
+    borderWidth: 2,
+    borderColor: "#FDE68A",
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     borderRadius: 12,
     alignItems: "center",
-    marginVertical: 4,
   },
-  primaryMenuBtnText: {
-    color: "#070916",
+  goldMenuBtnText: {
+    color: "#1C1917",
     fontSize: 16,
     fontWeight: "900",
   },
-  secondaryMenuBtn: {
-    backgroundColor: "#161F33",
+  darkMenuBtn: {
+    backgroundColor: "#1E293B",
     borderWidth: 1.5,
-    borderColor: "#45A29E",
+    borderColor: "#F59B1A",
     paddingVertical: 12,
     paddingHorizontal: 18,
     borderRadius: 12,
     alignItems: "center",
-    marginVertical: 4,
   },
-  secondaryMenuBtnText: {
-    color: "#66FCF1",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
-  menuBtnSub: {
-    fontSize: 11,
-    color: "#8892B0",
-    marginTop: 2,
+  darkMenuBtnText: {
+    color: "#FDE68A",
+    fontSize: 14,
+    fontWeight: "800",
   },
   menuRow: {
     flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
+    gap: 8,
   },
   halfBtn: {
     flex: 1,
-    backgroundColor: "#161F33",
-    paddingVertical: 12,
+    backgroundColor: "#0F172A",
+    paddingVertical: 11,
     borderRadius: 10,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#293B5F",
-  },
-  settingsBtn: {
-    backgroundColor: "#161F33",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#293B5F",
+    borderColor: "#334155",
   },
   halfBtnText: {
-    color: "#E6F1FF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  playContainer: {
-    flex: 1,
-    backgroundColor: "#070916",
-    paddingTop: 44,
-    paddingBottom: 16,
-    justifyContent: "space-between",
-  },
-  topHud: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 18,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1B243B",
-  },
-  hudLabel: {
-    color: "#8892B0",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  hudScore: {
-    color: "#66FCF1",
-    fontSize: 24,
-    fontWeight: "900",
-  },
-  hudCenter: {
-    alignItems: "center",
-  },
-  hudLevel: {
-    color: "#FFD166",
-    fontSize: 16,
+    color: "#F8FAFC",
+    fontSize: 12,
     fontWeight: "800",
   },
-  bannerPill: {
-    backgroundColor: "#FFD166",
-    color: "#070916",
-    fontSize: 11,
-    fontWeight: "900",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 2,
+  playScreen: {
+    flex: 1,
+    backgroundColor: "#020518",
+    paddingTop: Platform.OS === "ios" ? 48 : 34,
+    paddingBottom: 14,
+    justifyContent: "space-between",
   },
-  pauseBtn: {
-    backgroundColor: "#161F33",
-    width: 42,
-    height: 42,
-    borderRadius: 8,
+  orangeScoreHeader: {
+    backgroundColor: "#F59B1A",
+    borderTopWidth: 2,
+    borderTopColor: "#FDE68A",
+    borderBottomWidth: 3,
+    borderBottomColor: "#B45309",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#45A29E",
+    justifyContent: "space-between",
   },
-  pauseBtnText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
+  orangeHeaderText: {
+    color: "#1A1105",
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 0.5,
   },
-  middleStage: {
+  headerPausePill: {
+    backgroundColor: "#B45309",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  headerPauseText: {
+    color: "#FFFBEB",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  spaceSkyBanner: {
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  spaceSkyStars: {
+    color: "#E2E8F0",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 2,
+  },
+  arenaRow: {
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "flex-start",
-    paddingHorizontal: 12,
-    gap: 12,
+    alignItems: "stretch",
+    paddingHorizontal: 8,
   },
-  boardFrame: {
-    backgroundColor: "#0D1326",
+  goldenBoardFrame: {
+    backgroundColor: "#F5A623",
+    padding: 6,
+    borderRadius: 8,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopColor: "#FDE68A",
+    borderLeftColor: "#FDE68A",
+    borderRightWidth: 3,
+    borderBottomWidth: 3,
+    borderRightColor: "#B45309",
+    borderBottomColor: "#B45309",
+  },
+  boardInnerGrid: {
+    backgroundColor: "#BCE3E8",
     borderWidth: 2,
-    borderColor: "#45A29E",
-    padding: 3,
-    borderRadius: 6,
+    borderColor: "#88B3BA",
+    position: "relative",
+    overflow: "hidden",
   },
   boardRow: {
     flexDirection: "row",
   },
-  gridCell: {
-    borderWidth: 0.5,
-    borderColor: "#19233C",
-    padding: 1.5,
-  },
-  cellInner: {
-    flex: 1,
-    borderRadius: 4,
+  iceGridCell: {
+    backgroundColor: "#BCE3E8",
+    borderWidth: 1,
+    borderColor: "#DDF2F5",
     alignItems: "center",
     justifyContent: "center",
   },
-  normalGlyph: {
-    color: "#070916",
-    fontSize: 12,
+  activePieceOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+  },
+  cushionOuter: {
+    borderRadius: 6,
+    borderWidth: 2.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cushionBody: {
+    flex: 1,
+    width: "100%",
+    borderRadius: 3.5,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  shineCorner: {
+    position: "absolute",
+    top: 2,
+    left: 2,
+    width: 6,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+  },
+  innerEmblemWell: {
+    width: "54%",
+    height: "54%",
+    borderRadius: 99,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emblemSymbol: {
+    fontWeight: "900",
+    lineHeight: 15,
+  },
+  stoneOuter: {
+    backgroundColor: "#374151",
+    borderTopColor: "#9CA3AF",
+    borderLeftColor: "#9CA3AF",
+    borderRightColor: "#111827",
+    borderBottomColor: "#111827",
+  },
+  stoneInner: {
+    flex: 1,
+    width: "100%",
+    backgroundColor: "#4B5563",
+    borderRadius: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emblemText: {
+    color: "#F3F4F6",
+  },
+  rightColumn: {
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    paddingVertical: 8,
+  },
+  previewWithBridgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  goldenBridgeTab: {
+    width: 10,
+    height: 16,
+    backgroundColor: "#F5A623",
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    borderTopColor: "#FDE68A",
+    borderBottomColor: "#B45309",
+  },
+  goldenPreviewFrame: {
+    backgroundColor: "#F5A623",
+    padding: 5,
+    borderRadius: 6,
+    borderTopWidth: 2.5,
+    borderLeftWidth: 2.5,
+    borderTopColor: "#FDE68A",
+    borderLeftColor: "#FDE68A",
+    borderRightWidth: 2.5,
+    borderBottomWidth: 2.5,
+    borderRightColor: "#B45309",
+    borderBottomColor: "#B45309",
+  },
+  creamPreviewInner: {
+    backgroundColor: "#F7F5D7",
+    borderWidth: 1.5,
+    borderColor: "#C8C294",
+  },
+  creamPreviewCell: {
+    backgroundColor: "#F7F5D7",
+    borderWidth: 1,
+    borderColor: "#E5E2B8",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  competitorStage: {
+    width: PREVIEW_CELL_SIZE * 3 + 22,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 12,
+  },
+  ufoSceneContainer: {
+    width: 112,
+    height: 145,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  ufoStars: {
+    position: "absolute",
+    top: 0,
+    color: "#CBD5E1",
+    fontSize: 11,
+    letterSpacing: 3,
+  },
+  bluePlanetHorizon: {
+    position: "absolute",
+    bottom: 0,
+    width: 112,
+    height: 48,
+    borderTopLeftRadius: 60,
+    borderTopRightRadius: 60,
+    backgroundColor: "#1D4ED8",
+    borderTopWidth: 3,
+    borderLeftWidth: 2,
+    borderRightWidth: 2,
+    borderColor: "#93C5FD",
+    overflow: "hidden",
+    alignItems: "center",
+  },
+  bluePlanetGlow: {
+    width: 80,
+    height: 16,
+    borderRadius: 10,
+    backgroundColor: "#60A5FA",
+    marginTop: 4,
+    opacity: 0.6,
+  },
+  ufoWrapper: {
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  cockpitGlass: {
+    position: "absolute",
+    top: -4,
+    width: 68,
+    height: 54,
+    borderTopLeftRadius: 34,
+    borderTopRightRadius: 34,
+    backgroundColor: "rgba(148, 163, 184, 0.32)",
+    borderWidth: 1.5,
+    borderColor: "rgba(226, 232, 240, 0.65)",
+  },
+  creatureHead: {
+    width: 54,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    zIndex: 2,
+  },
+  creatureEar: {
+    position: "absolute",
+    top: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+  },
+  earLeft: {
+    left: 2,
+  },
+  earRight: {
+    right: 2,
+  },
+  stripeRow: {
+    flexDirection: "row",
+    gap: 3,
+    marginBottom: 2,
+  },
+  stripeBar: {
+    width: 3,
+    height: 6,
+    backgroundColor: "#451A03",
+    borderRadius: 1,
+  },
+  eyeRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "center",
+    marginTop: 2,
+  },
+  eyeBall: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eyePupil: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#020617",
+  },
+  happyEyeArch: {
+    color: "#1E293B",
+    fontSize: 14,
     fontWeight: "900",
   },
-  stoneCell: {
-    backgroundColor: "#393E46",
-    borderWidth: 2,
-    borderColor: "#7F8487",
-  },
-  stoneGlyph: {
-    color: "#D3D6DB",
-    fontSize: 13,
-    fontWeight: "bold",
-  },
-  bombCell: {
-    backgroundColor: "#FF5722",
-    borderWidth: 2,
-    borderColor: "#FFCCBC",
-  },
-  flashCell: {
-    backgroundColor: "#00E5FF",
-    borderWidth: 2,
-    borderColor: "#E0F7FA",
-  },
-  starCell: {
-    backgroundColor: "#FFD600",
-    borderWidth: 2,
-    borderColor: "#FFF9C4",
-  },
-  specialGlyph: {
-    fontSize: 13,
-  },
-  sidePanel: {
-    width: 112,
+  cheekRow: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "center",
+    marginTop: 1,
   },
-  sideTitle: {
-    color: "#8892B0",
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  previewBox: {
-    backgroundColor: "#0D1326",
-    borderWidth: 1.5,
-    borderColor: "#293B5F",
-    padding: 4,
+  puffyCheek: {
+    width: 16,
+    height: 11,
     borderRadius: 6,
   },
-  previewCell: {
-    width: 24,
-    height: 24,
-    borderWidth: 0.5,
-    borderColor: "#19233C",
-    padding: 1,
-  },
-  mascotBox: {
-    width: "100%",
-    backgroundColor: "#10182F",
-    borderWidth: 1.5,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
+  noseMouthBox: {
     alignItems: "center",
+    marginHorizontal: 2,
   },
-  mascotName: {
-    color: "#E6F1FF",
-    fontSize: 12,
-    fontWeight: "bold",
+  cuteNose: {
+    width: 6,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#7C2D12",
   },
-  mascotAvatar: {
-    fontSize: 36,
-    marginVertical: 6,
+  cuteMouth: {
+    width: 8,
+    height: 4,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    backgroundColor: "#DC2626",
+    marginTop: 1,
   },
-  mascotExpression: {
-    fontSize: 11,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  statsBox: {
-    width: "100%",
-    backgroundColor: "#0D1326",
-    padding: 8,
-    borderRadius: 8,
+  saucerCollar: {
+    width: 58,
+    height: 8,
+    backgroundColor: "#EF4444",
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: "#1B243B",
+    borderColor: "#FCA5A5",
+    marginTop: -4,
+    zIndex: 3,
   },
-  statLine: {
-    color: "#8892B0",
-    fontSize: 11,
-    fontWeight: "600",
+  saucerDiscOuter: {
+    width: 86,
+    height: 24,
+    borderRadius: 14,
+    backgroundColor: "#E2E8F0",
+    borderWidth: 2,
+    borderColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -3,
+    zIndex: 4,
+  },
+  saucerDiscInner: {
+    width: 68,
+    height: 14,
+    borderRadius: 8,
+    backgroundColor: "#94A3B8",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    paddingHorizontal: 6,
+  },
+  saucerLightDot: {
+    width: 8,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#475569",
+  },
+  pilotNameTag: {
+    color: "#FDE68A",
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 2,
   },
   controlStrip: {
     flexDirection: "row",
     justifyContent: "space-evenly",
     paddingHorizontal: 10,
-    paddingTop: 6,
+    paddingTop: 4,
   },
   ctrlBtn: {
-    backgroundColor: "#161F33",
-    borderWidth: 1.5,
-    borderColor: "#66FCF1",
-    minWidth: 62,
-    height: 60,
+    backgroundColor: "#1E293B",
+    borderWidth: 2,
+    borderColor: "#F5A623",
+    minWidth: 66,
+    height: 56,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   hardDropBtn: {
-    borderColor: "#FFD166",
+    borderColor: "#38BDF8",
   },
   ctrlBtnText: {
-    color: "#FFFFFF",
-    fontSize: 22,
+    color: "#FFFBEB",
+    fontSize: 20,
     fontWeight: "bold",
   },
   ctrlSubLabel: {
-    color: "#8892B0",
+    color: "#FDE68A",
     fontSize: 9,
-    fontWeight: "bold",
-    marginTop: 1,
+    fontWeight: "800",
   },
   overlayBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(7, 9, 22, 0.85)",
+    backgroundColor: "rgba(2, 5, 24, 0.85)",
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
@@ -1145,56 +1571,54 @@ const styles = StyleSheet.create({
   overlayCard: {
     width: "100%",
     maxWidth: 320,
-    backgroundColor: "#10182F",
-    borderWidth: 2,
-    borderColor: "#66FCF1",
+    backgroundColor: "#0F172A",
+    borderWidth: 3,
+    borderColor: "#F5A623",
     borderRadius: 14,
     padding: 20,
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
   overlayTitle: {
-    color: "#FFD166",
-    fontSize: 20,
+    color: "#F59B1A",
+    fontSize: 22,
     fontWeight: "900",
-    textAlign: "center",
   },
   overlayScore: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "bold",
-    marginBottom: 8,
   },
   modalScreen: {
     flex: 1,
-    backgroundColor: "#070916",
+    backgroundColor: "#020518",
   },
   modalContent: {
     padding: 24,
-    paddingTop: 56,
+    paddingTop: 52,
     gap: 12,
   },
   sectionHeader: {
-    color: "#66FCF1",
+    color: "#F59B1A",
     fontSize: 24,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   infoCard: {
-    backgroundColor: "#10182F",
-    borderWidth: 1,
-    borderColor: "#293B5F",
+    backgroundColor: "#0F172A",
+    borderWidth: 1.5,
+    borderColor: "#F5A623",
     borderRadius: 10,
     padding: 14,
     gap: 6,
   },
   infoTitle: {
-    color: "#FFD166",
+    color: "#FDE68A",
     fontSize: 15,
     fontWeight: "bold",
   },
   infoBody: {
-    color: "#C5C6C7",
+    color: "#E2E8F0",
     fontSize: 13,
     lineHeight: 19,
   },
@@ -1203,24 +1627,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingVertical: 4,
     borderBottomWidth: 0.5,
-    borderBottomColor: "#1F2833",
+    borderBottomColor: "#1E293B",
   },
   scoreRank: {
     color: "#FFFFFF",
     fontWeight: "bold",
   },
   scoreVal: {
-    color: "#66FCF1",
+    color: "#F59B1A",
     fontWeight: "bold",
   },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    backgroundColor: "#10182F",
+    backgroundColor: "#0F172A",
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#293B5F",
+    borderColor: "#334155",
   },
   toggleLabel: {
     color: "#FFFFFF",
@@ -1228,12 +1652,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   toggleValue: {
-    color: "#66FCF1",
+    color: "#F59B1A",
     fontSize: 14,
     fontWeight: "900",
   },
   testLine: {
-    color: "#66FCF1",
+    color: "#4ADE80",
     fontSize: 12,
     fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },

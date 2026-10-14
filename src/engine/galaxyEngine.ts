@@ -1,3 +1,5 @@
+// src/engine/galaxyEngine.ts
+
 export const GRID_COLS = 6;
 export const GRID_ROWS = 10;
 export const PREVIEW_SIZE = 3;
@@ -9,7 +11,7 @@ export type MascotMood = "IDLE" | "HAPPY" | "COMBO" | "DANGER" | "TRANSITION";
 
 export interface Cell {
   kind: CellKind;
-  colorId?: number; // 0..4 for NORMAL blocks
+  colorId?: number;
 }
 
 export interface PieceCellOffset {
@@ -20,8 +22,8 @@ export interface PieceCellOffset {
 }
 
 export interface ActivePiece {
-  x: number; // Pivot column
-  y: number; // Pivot row
+  x: number;
+  y: number;
   cells: PieceCellOffset[];
   isSingleSpecial: boolean;
 }
@@ -46,10 +48,10 @@ export interface GameConfig {
 export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
   CLASSIC: {
     mode: "CLASSIC",
-    numColors: 4,
-    initialFallMs: 1050,
+    numColors: 5,
+    initialFallMs: 950,
     minFallMs: 260,
-    speedDecayPerLevel: 85,
+    speedDecayPerLevel: 75,
     threeBlockUnlockLevel: 2,
     experimentalFourBlockPieces: false,
     rotationMode: "GEOMETRY_90",
@@ -62,10 +64,10 @@ export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
   },
   COMFORT: {
     mode: "COMFORT",
-    numColors: 4,
-    initialFallMs: 750,
+    numColors: 5,
+    initialFallMs: 720,
     minFallMs: 240,
-    speedDecayPerLevel: 65,
+    speedDecayPerLevel: 60,
     threeBlockUnlockLevel: 2,
     experimentalFourBlockPieces: false,
     rotationMode: "GEOMETRY_90",
@@ -78,9 +80,9 @@ export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
   },
   PRACTICE: {
     mode: "PRACTICE",
-    numColors: 4,
-    initialFallMs: 1200,
-    minFallMs: 500,
+    numColors: 5,
+    initialFallMs: 1100,
+    minFallMs: 450,
     speedDecayPerLevel: 30,
     threeBlockUnlockLevel: 3,
     experimentalFourBlockPieces: false,
@@ -98,43 +100,53 @@ export interface MascotInfo {
   id: number;
   name: string;
   species: string;
-  primaryColor: string;
-  accentColor: string;
-  symbol: string;
+  furColor: string;
+  cheeksColor: string;
+  earColor: string;
+  eyeColor: string;
+  stripes: boolean;
 }
 
 export const MASCOTS: MascotInfo[] = [
   {
     id: 0,
-    name: "Lumibee",
-    species: "Yellow Solar Sprite",
-    primaryColor: "#FFD166",
-    accentColor: "#FFF3B0",
-    symbol: "🐝",
+    name: "Pikko",
+    species: "Golden Space Hamster",
+    furColor: "#F59E0B",
+    cheeksColor: "#FEF3C7",
+    earColor: "#D97706",
+    eyeColor: "#1D4ED8",
+    stripes: false,
   },
   {
     id: 1,
-    name: "Nebulon",
-    species: "Cyan Comet Moth",
-    primaryColor: "#66FCF1",
-    accentColor: "#C5FFF8",
-    symbol: "🦋",
+    name: "Tigra",
+    species: "Striped Tabby Pilot",
+    furColor: "#D69E5C",
+    cheeksColor: "#FDE68A",
+    earColor: "#78350F",
+    eyeColor: "#EAB308",
+    stripes: true,
   },
   {
     id: 2,
-    name: "Pyrobit",
-    species: "Coral Orbit Drifter",
-    primaryColor: "#FF6B6B",
-    accentColor: "#FFC2C2",
-    symbol: "👾",
+    name: "Zorbi",
+    species: "Azure Star Fox",
+    furColor: "#38BDF8",
+    cheeksColor: "#E0F2FE",
+    earColor: "#0284C7",
+    eyeColor: "#FDE047",
+    stripes: false,
   },
   {
     id: 3,
-    name: "Voidwing",
-    species: "Violet Nova Owl",
-    primaryColor: "#B388EB",
-    accentColor: "#E0C3FC",
-    symbol: "🦉",
+    name: "Nyxie",
+    species: "Violet Nova Lynx",
+    furColor: "#A855F7",
+    cheeksColor: "#F3E8FF",
+    earColor: "#6B21A8",
+    eyeColor: "#4ADE80",
+    stripes: true,
   },
 ];
 
@@ -173,7 +185,6 @@ export interface EngineState {
   consecutiveHazards: number;
 }
 
-// Deterministic Mulberry32 PRNG
 export function nextRandom(seed: number): { value: number; nextSeed: number } {
   let t = (seed + 0x6d2b79f5) | 0;
   t = Math.imul(t ^ (t >>> 15), t | 1);
@@ -205,7 +216,6 @@ export function generatePiece(
     return r.value;
   };
 
-  // Determine if single-cell special piece spawns
   const specialChance = Math.min(
     0.18,
     config.specialChanceBase + (level - 1) * 0.01
@@ -226,12 +236,11 @@ export function generatePiece(
     };
   }
 
-  // Determine piece size: 2 blocks early, 3 blocks at higher levels, 4 if experimental enabled
   let numBlocks = 2;
   if (level >= config.threeBlockUnlockLevel) {
     const threeChance = Math.min(
       0.65,
-      0.25 + (level - config.threeBlockUnlockLevel) * 0.1
+      0.35 + (level - config.threeBlockUnlockLevel) * 0.1
     );
     if (rand() < threeChance) {
       numBlocks = 3;
@@ -241,7 +250,6 @@ export function generatePiece(
     numBlocks = 4;
   }
 
-  // Pick shape layout
   let offsets: { dx: number; dy: number }[] = [
     { dx: 0, dy: 0 },
     { dx: 0, dy: 1 },
@@ -253,11 +261,11 @@ export function generatePiece(
         ? [
             { dx: 0, dy: 0 },
             { dx: 0, dy: 1 },
-          ] // Vertical pair
+          ]
         : [
             { dx: 0, dy: 0 },
             { dx: 1, dy: 0 },
-          ]; // Horizontal pair
+          ];
   } else if (numBlocks === 3) {
     const shapeRoll = rand();
     if (shapeRoll < 0.35) {
@@ -265,19 +273,19 @@ export function generatePiece(
         { dx: 0, dy: 0 },
         { dx: 0, dy: 1 },
         { dx: 0, dy: 2 },
-      ]; // Vertical 3
+      ];
     } else if (shapeRoll < 0.65) {
       offsets = [
         { dx: 0, dy: 0 },
         { dx: 1, dy: 0 },
         { dx: 2, dy: 0 },
-      ]; // Horizontal 3
+      ];
     } else {
       offsets = [
-        { dx: 0, dy: 0 },
         { dx: 0, dy: 1 },
+        { dx: 1, dy: 0 },
         { dx: 1, dy: 1 },
-      ]; // L-corner 3
+      ];
     }
   } else if (numBlocks === 4) {
     offsets = [
@@ -288,17 +296,15 @@ export function generatePiece(
     ];
   }
 
-  // Assign colors or stone hazard
   const stoneChance =
     consecutiveHazards >= config.maxConsecutiveHazards
       ? 0
       : Math.min(0.25, config.stoneChanceBase + (level - 1) * 0.02);
 
   let hasStone = false;
-  const activeColors = Math.min(5, config.numColors + (level >= 5 ? 1 : 0));
+  const activeColors = Math.min(5, config.numColors);
 
   const cells: PieceCellOffset[] = offsets.map((off, idx) => {
-    // Allow at most 1 stone inside a multi-block piece so play remains fair
     if (!hasStone && idx === 0 && rand() < stoneChance) {
       hasStone = true;
       return { dx: off.dx, dy: off.dy, kind: "STONE" };
@@ -355,7 +361,6 @@ export function rotateActivePiece(state: EngineState): boolean {
   if (p.cells.length <= 1) return false;
 
   if (state.config.rotationMode === "COLOR_CYCLE") {
-    // Cycle colors/kinds among the cells without changing geometry
     const cycled: PieceCellOffset[] = p.cells.map((cell, idx) => {
       const prev = p.cells[(idx + p.cells.length - 1) % p.cells.length];
       return {
@@ -369,7 +374,6 @@ export function rotateActivePiece(state: EngineState): boolean {
     return true;
   }
 
-  // Standard 90-degree clockwise rotation around (0,0) with bounding normalization
   const rawRotated = p.cells.map((c) => ({
     ...c,
     dx: -c.dy,
@@ -383,7 +387,6 @@ export function rotateActivePiece(state: EngineState): boolean {
     dy: c.dy - minDy,
   }));
 
-  // Try in-place, then wall-kick left/right/up by 1 cell
   const kicks = [
     { kx: 0, ky: 0 },
     { kx: -1, ky: 0 },
@@ -404,7 +407,6 @@ export function rotateActivePiece(state: EngineState): boolean {
     }
   }
 
-  // Fallback: cycle cell colors if geometry is boxed in between stacks
   const cycled: PieceCellOffset[] = p.cells.map((cell, idx) => {
     const prev = p.cells[(idx + p.cells.length - 1) % p.cells.length];
     return {
@@ -426,7 +428,6 @@ export function getGhostY(grid: Cell[][], piece: ActivePiece): number {
   return gy;
 }
 
-// Apply per-column downward gravity so unsupported blocks fall straight down
 export function applyGravity(grid: Cell[][]): boolean {
   let moved = false;
   for (let col = 0; col < GRID_COLS; col++) {
@@ -446,14 +447,13 @@ export function applyGravity(grid: Cell[][]): boolean {
   return moved;
 }
 
-// Find all 3+ straight-line matches of identical NORMAL colors across 4 axes
 export function findMatches(grid: Cell[][]): { row: number; col: number }[] {
   const matchedSet = new Set<string>();
   const directions = [
-    { dr: 0, dc: 1 }, // Horizontal
-    { dr: 1, dc: 0 }, // Vertical
-    { dr: 1, dc: 1 }, // Diagonal down-right
-    { dr: 1, dc: -1 }, // Diagonal down-left
+    { dr: 0, dc: 1 },
+    { dr: 1, dc: 0 },
+    { dr: 1, dc: 1 },
+    { dr: 1, dc: -1 },
   ];
 
   for (let r = 0; r < GRID_ROWS; r++) {
@@ -463,7 +463,6 @@ export function findMatches(grid: Cell[][]): { row: number; col: number }[] {
         continue;
 
       for (const { dr, dc } of directions) {
-        // Skip if the previous cell in this direction had the same color (avoid redundant scans)
         const prevR = r - dr;
         const prevC = c - dc;
         if (
@@ -508,7 +507,6 @@ export function findMatches(grid: Cell[][]): { row: number; col: number }[] {
   });
 }
 
-// Resolve special single-cell landing effects before normal matching
 export function resolveSpecialLanding(
   grid: Cell[][],
   landedRow: number,
@@ -537,7 +535,6 @@ export function resolveSpecialLanding(
       }
     }
   } else if (specialKind === "STAR") {
-    // Determine target color: prefer directly below impact, otherwise adjacent normal cell
     let targetColor: number | undefined;
     const candidates = [
       { r: landedRow + 1, c: landedCol },
@@ -556,10 +553,8 @@ export function resolveSpecialLanding(
       }
     }
 
-    // Consume the star itself
     grid[landedRow][landedCol] = { kind: "EMPTY" };
 
-    // Remove all normal cells of targetColor globally (never removes STONE)
     if (targetColor !== undefined) {
       for (let r = 0; r < GRID_ROWS; r++) {
         for (let c = 0; c < GRID_COLS; c++) {
@@ -579,7 +574,6 @@ export function resolveSpecialLanding(
   return removedCount;
 }
 
-// Resolve full cascades of normal matches + gravity until stable
 export function resolveCascades(grid: Cell[][]): {
   totalCleared: number;
   chainDepth: number;
@@ -649,7 +643,6 @@ export function createNewGameState(
   };
 }
 
-// Lock active piece, resolve specials, gravity, cascades, level progression, and next spawn
 export function lockActivePieceAndResolve(
   state: EngineState
 ): LockResolutionSummary {
@@ -666,7 +659,6 @@ export function lockActivePieceAndResolve(
   if (!state.activePiece) return summary;
   const p = state.activePiece;
 
-  // 1. Insert active piece cells into settled grid
   let specialPos: { row: number; col: number; kind: CellKind } | null = null;
   for (const c of p.cells) {
     const r = p.y + c.dy;
@@ -683,12 +675,9 @@ export function lockActivePieceAndResolve(
   state.piecesPlaced++;
   state.activePiece = null;
 
-  // 2. Let individual cells settle first if multi-cell piece has an overhang
   applyGravity(state.grid);
 
-  // 3. If a single-cell special landed, locate where it settled and trigger it once
   if (specialPos) {
-    // After initial gravity, find the lowest row in that column where the special settled
     let settledRow = specialPos.row;
     for (let r = GRID_ROWS - 1; r >= 0; r--) {
       if (state.grid[r][specialPos.col].kind === specialPos.kind) {
@@ -705,10 +694,9 @@ export function lockActivePieceAndResolve(
     );
     summary.specialTriggered = specialPos.kind;
     summary.clearedCount += specialRemoved;
-    summary.scoreDelta += specialRemoved * 8;
+    summary.scoreDelta += specialRemoved * 10;
   }
 
-  // 4. Resolve cascades of 3+ matches
   const cascade = resolveCascades(state.grid);
   summary.clearedCount += cascade.totalCleared;
   summary.chainDepth = cascade.chainDepth;
@@ -719,18 +707,13 @@ export function lockActivePieceAndResolve(
   state.lastChainDepth = cascade.chainDepth;
   state.lastSpecialTriggered = summary.specialTriggered;
 
-  // 5. Level & Mascot Progression (every 250 points or 18 cleared blocks)
-  const targetLevel = Math.max(1, Math.floor(state.score / 250) + 1);
+  const targetLevel = Math.max(1, Math.floor(state.score / 180) + 1);
   if (targetLevel > state.level) {
     state.level = targetLevel;
     summary.levelUp = true;
-    state.mascotIndex = Math.min(
-      MASCOTS.length - 1,
-      Math.floor((state.level - 1) / 2)
-    );
+    state.mascotIndex = Math.min(MASCOTS.length - 1, state.level - 1);
   }
 
-  // 6. Mascot Mood Reaction
   const highestOccupiedRow = state.grid.findIndex((row) =>
     row.some((cell) => cell.kind !== "EMPTY")
   );
@@ -748,7 +731,6 @@ export function lockActivePieceAndResolve(
     state.mascotMood = "IDLE";
   }
 
-  // 7. Spawn Next Piece & Check Deterministic Spawn Collision for Game Over
   const candidate = state.nextPiece;
   const nextGen = generatePiece(
     state.config,
