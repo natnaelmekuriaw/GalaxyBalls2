@@ -746,7 +746,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -778,7 +778,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -804,8 +804,8 @@ export default function OrbitBlocksApp() {
                 accessibilityLabel={option.label}
                 style={[styles.languageOption, language === option.code && styles.languageSelected]}
                 onPress={() => {
-                  playSound("ui");
                   setLanguage(option.code);
+                  showScreen("TITLE");
                 }}
               >
                 <Text style={styles.languageLabel}>
@@ -915,7 +915,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -1160,7 +1160,7 @@ export default function OrbitBlocksApp() {
               style={styles.darkMenuBtn}
               onPress={() => showScreen("TITLE")}
             >
-              <Text style={styles.darkMenuBtnText}>🏠 {t("titleScreen")}</Text>
+              <Text style={styles.darkMenuBtnText}>🏠 {t("mainMenu")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1214,6 +1214,7 @@ const styles = StyleSheet.create({
   },
   homeLanguageIcon: {
     fontSize: 18,
+    color: "#FDE68A",
   },
   homeLanguageLabel: {
     color: "#F8FAFC",
