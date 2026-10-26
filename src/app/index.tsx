@@ -1,5 +1,5 @@
 // src/app/(tabs)/index.tsx
-import { useNavigation } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -696,6 +696,18 @@ export default function OrbitBlocksApp() {
             <Text style={styles.darkMenuBtnText}>⚡ {t("playComfort")}</Text>
             <Text style={styles.modeHint}>{t("quickPlayHint")}</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.darkMenuBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t("otherGames")}
+            onPress={() => {
+              playSound("ui");
+              menuMusic.start();
+              router.navigate("/explore");
+            }}
+          >
+            <Text style={styles.darkMenuBtnText}>{t("otherGames")}</Text>
+          </TouchableOpacity>
           <View style={styles.menuRow}>
             <TouchableOpacity
               style={styles.halfBtn}
@@ -746,7 +758,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -778,7 +790,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -804,8 +816,8 @@ export default function OrbitBlocksApp() {
                 accessibilityLabel={option.label}
                 style={[styles.languageOption, language === option.code && styles.languageSelected]}
                 onPress={() => {
-                  playSound("ui");
                   setLanguage(option.code);
+                  showScreen("TITLE");
                 }}
               >
                 <Text style={styles.languageLabel}>
@@ -915,7 +927,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToMenu")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -1160,7 +1172,7 @@ export default function OrbitBlocksApp() {
               style={styles.darkMenuBtn}
               onPress={() => showScreen("TITLE")}
             >
-              <Text style={styles.darkMenuBtnText}>🏠 {t("titleScreen")}</Text>
+              <Text style={styles.darkMenuBtnText}>🏠 {t("mainMenu")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1214,6 +1226,7 @@ const styles = StyleSheet.create({
   },
   homeLanguageIcon: {
     fontSize: 18,
+    color: "#FDE68A",
   },
   homeLanguageLabel: {
     color: "#F8FAFC",
