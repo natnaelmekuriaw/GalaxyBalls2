@@ -62,4 +62,6 @@ npm run test:sounds
 
 To check the interface, run `npm run web`, choose each language in Settings, and visit
 the title screen, rules, high scores, gameplay, and pause screen. Check a small portrait
-viewport and confirm that changing the language keeps the selected radio option visible.
+viewport and confirm that selecting a language returns to the translated main menu.
+Open **Other Games** below Quick Play to see the collection. Galaxy Balls is the
+only entry for now; opening it returns to the main menu to choose a play mode.
