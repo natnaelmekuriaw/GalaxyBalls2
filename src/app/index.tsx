@@ -24,6 +24,7 @@ import {
   MASCOTS,
   MascotInfo,
   MascotMood,
+  LockResolutionSummary,
   canPlacePiece,
   createNewGameState,
   getFallIntervalMs,
@@ -38,6 +39,8 @@ import { runAllEngineTests } from "../engine/galaxyEngine.test";
 import { GameText as Text } from "../components/game-text";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { LANGUAGES } from "../i18n/translations";
+import { getResolutionSound } from "../audio/soundEvents";
+import { useGameSounds } from "../hooks/use-game-sounds";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -244,6 +247,8 @@ export default function OrbitBlocksApp() {
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
+  const [soundsEnabled, setSoundsEnabled] = useState(true);
+  const { play: playSound, stop: stopSounds } = useGameSounds(soundsEnabled);
   const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
   const highContrast = false;
   const [rotationStrategy, setRotationStrategy] = useState<
@@ -273,6 +278,21 @@ export default function OrbitBlocksApp() {
   const forceRender = useCallback(() => {
     setGameState(snapshotEngineState(stateRef.current));
   }, []);
+
+  const showScreen = (target: typeof screen) => {
+    stopSounds();
+    playSound("ui");
+    setScreen(target);
+  };
+
+  const togglePause = () => {
+    const state = stateRef.current;
+    if (state.status !== "PLAYING" && state.status !== "PAUSED") return;
+    state.status = state.status === "PLAYING" ? "PAUSED" : "PLAYING";
+    stopSounds();
+    playSound("ui");
+    forceRender();
+  };
 
   useEffect(() => {
     if (screen === "GAME" && gameState.status !== "PLAYING") return;
@@ -325,6 +345,24 @@ export default function OrbitBlocksApp() {
     },
     []
   );
+
+  const handleResolution = useCallback((state: EngineState, summary: LockResolutionSummary) => {
+    playSound(getResolutionSound(summary));
+    if (summary.stoneLanded) triggerHaptic(65);
+    if (summary.specialTriggered) {
+      setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
+      triggerHaptic(50);
+    } else if (summary.chainDepth >= 2) {
+      setBannerText(t("cascade", { count: summary.chainDepth }));
+      triggerHaptic(40);
+    } else if (summary.levelUp) {
+      setBannerText(t("levelUp", { level: state.level }));
+    } else if (summary.clearedCount > 0) {
+      setBannerText(`+${summary.scoreDelta}`);
+      triggerHaptic(20);
+    }
+    if (summary.gameOver) recordHighScore(state.config.mode, state.score, state.level);
+  }, [playSound, triggerHaptic, t, recordHighScore]);
 
   const syncSmoothPieceAnimation = useCallback(
     (s: EngineState, immediateX = false) => {
@@ -384,24 +422,7 @@ export default function OrbitBlocksApp() {
       const prevPiece = s.activePiece;
       const summary = stepGravityTick(s);
 
-      if (summary) {
-        if (summary.stoneLanded) triggerHaptic(65);
-        if (summary.specialTriggered) {
-          setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
-          triggerHaptic(50);
-        } else if (summary.chainDepth >= 2) {
-          setBannerText(t("cascade", { count: summary.chainDepth }));
-          triggerHaptic(40);
-        } else if (summary.levelUp) {
-          setBannerText(t("levelUp", { level: s.level }));
-        } else if (summary.clearedCount > 0) {
-          setBannerText(`+${summary.scoreDelta}`);
-          triggerHaptic(20);
-        }
-        if (summary.gameOver) {
-          recordHighScore(s.config.mode, s.score, s.level);
-        }
-      }
+      if (summary) handleResolution(s, summary);
 
       const spawnedNew = prevPiece !== s.activePiece && s.activePiece?.y === 0;
       syncSmoothPieceAnimation(s, spawnedNew);
@@ -415,10 +436,8 @@ export default function OrbitBlocksApp() {
     gameState.level,
     gameState.config,
     forceRender,
-    triggerHaptic,
-    recordHighScore,
+    handleResolution,
     syncSmoothPieceAnimation,
-    t,
     animX,
     animY,
   ]);
@@ -430,6 +449,8 @@ export default function OrbitBlocksApp() {
   }, [bannerText]);
 
   const startNewGame = (mode: GameMode) => {
+    stopSounds();
+    playSound("start");
     const fresh = createNewGameState(mode, {
       rotationMode: rotationStrategy,
       experimentalFourBlockPieces: experimental4Block,
@@ -446,6 +467,7 @@ export default function OrbitBlocksApp() {
   const handleMoveLeft = () => {
     const state = stateRef.current;
     if (movePiece(state, -1, 0)) {
+      playSound("move");
       triggerHaptic(10);
       Animated.timing(animX, {
         toValue: state.activePiece!.x * CELL_SIZE,
@@ -460,6 +482,7 @@ export default function OrbitBlocksApp() {
   const handleMoveRight = () => {
     const state = stateRef.current;
     if (movePiece(state, 1, 0)) {
+      playSound("move");
       triggerHaptic(10);
       Animated.timing(animX, {
         toValue: state.activePiece!.x * CELL_SIZE,
@@ -474,6 +497,7 @@ export default function OrbitBlocksApp() {
   const handleRotate = () => {
     const state = stateRef.current;
     if (rotateActivePiece(state)) {
+      playSound("rotate");
       triggerHaptic(15);
       Animated.timing(animX, {
         toValue: state.activePiece!.x * CELL_SIZE,
@@ -486,10 +510,10 @@ export default function OrbitBlocksApp() {
 
   const handleSoftDrop = () => {
     const s = stateRef.current;
+    if (s.status !== "PLAYING") return;
     const summary = stepGravityTick(s);
-    if (summary?.gameOver) {
-      recordHighScore(s.config.mode, s.score, s.level);
-    }
+    if (summary) handleResolution(s, summary);
+    else playSound("move");
     syncSmoothPieceAnimation(s, summary !== null);
     triggerHaptic(10);
     forceRender();
@@ -500,9 +524,7 @@ export default function OrbitBlocksApp() {
     if (state.status !== "PLAYING" || !state.config.allowHardDrop || !state.activePiece) return;
     state.activePiece.y = getGhostY(state.grid, state.activePiece);
     const summary = lockActivePieceAndResolve(state);
-    if (summary.gameOver) {
-      recordHighScore(state.config.mode, state.score, state.level);
-    }
+    handleResolution(state, summary);
     syncSmoothPieceAnimation(state, true);
     triggerHaptic(45);
     forceRender();
@@ -607,7 +629,7 @@ export default function OrbitBlocksApp() {
           style={styles.homeLanguageButton}
           accessibilityRole="button"
           accessibilityLabel={t("languageShortcut", { language: languageLabel })}
-          onPress={() => setScreen("SETTINGS")}
+          onPress={() => showScreen("SETTINGS")}
         >
           <Text style={styles.homeLanguageIcon}>🌐</Text>
           <Text style={styles.homeLanguageLabel}>{languageLabel}</Text>
@@ -646,19 +668,19 @@ export default function OrbitBlocksApp() {
           <View style={styles.menuRow}>
             <TouchableOpacity
               style={styles.halfBtn}
-              onPress={() => setScreen("HOWTO")}
+              onPress={() => showScreen("HOWTO")}
             >
               <Text style={styles.halfBtnText}>📖 {t("rules")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.halfBtn}
-              onPress={() => setScreen("HIGHSCORES")}
+              onPress={() => showScreen("HIGHSCORES")}
             >
               <Text style={styles.halfBtnText}>🏆 {t("topFive")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.halfBtn}
-              onPress={() => setScreen("SETTINGS")}
+              onPress={() => showScreen("SETTINGS")}
             >
               <Text style={styles.halfBtnText}>⚙️ {t("setup")}</Text>
             </TouchableOpacity>
@@ -691,7 +713,7 @@ export default function OrbitBlocksApp() {
         </View>
         <TouchableOpacity
           style={styles.goldMenuBtn}
-          onPress={() => setScreen("TITLE")}
+          onPress={() => showScreen("TITLE")}
         >
           <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
@@ -723,7 +745,7 @@ export default function OrbitBlocksApp() {
         ))}
         <TouchableOpacity
           style={styles.goldMenuBtn}
-          onPress={() => setScreen("TITLE")}
+          onPress={() => showScreen("TITLE")}
         >
           <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
@@ -759,6 +781,30 @@ export default function OrbitBlocksApp() {
             ))}
           </View>
         </View>
+        <TouchableOpacity
+          style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={t("soundEffects")}
+          accessibilityState={{ checked: soundsEnabled }}
+          aria-checked={soundsEnabled}
+          onPress={() => {
+            stopSounds();
+            setSoundsEnabled(!soundsEnabled);
+          }}
+        >
+          <Text style={styles.toggleLabel}>{t("soundEffects")}</Text>
+          <Text style={styles.toggleValue}>{t(soundsEnabled ? "on" : "off")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.darkMenuBtn, !soundsEnabled && { opacity: 0.45 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t("testSound")}
+          accessibilityState={{ disabled: !soundsEnabled }}
+          disabled={!soundsEnabled}
+          onPress={() => playSound("clear")}
+        >
+          <Text style={styles.darkMenuBtnText}>♫ {t("testSound")}</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => setHapticsEnabled(!hapticsEnabled)}
@@ -808,7 +854,7 @@ export default function OrbitBlocksApp() {
         )}
         <TouchableOpacity
           style={styles.goldMenuBtn}
-          onPress={() => setScreen("TITLE")}
+          onPress={() => showScreen("TITLE")}
         >
           <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
@@ -837,11 +883,7 @@ export default function OrbitBlocksApp() {
         <TouchableOpacity
           style={styles.headerPausePill}
           accessibilityLabel={t("pause")}
-          onPress={() => {
-            stateRef.current.status =
-              stateRef.current.status === "PAUSED" ? "PLAYING" : "PAUSED";
-            forceRender();
-          }}
+          onPress={togglePause}
         >
           <Text style={styles.headerPauseText}>
             {gameState.status === "PAUSED" ? "▶" : "❚❚"}
@@ -1043,10 +1085,7 @@ export default function OrbitBlocksApp() {
             {gameState.status === "PAUSED" ? (
               <TouchableOpacity
                 style={styles.goldMenuBtn}
-                onPress={() => {
-                  stateRef.current.status = "PLAYING";
-                  forceRender();
-                }}
+                onPress={togglePause}
               >
                 <Text style={styles.goldMenuBtnText}>▶ {t("resume")}</Text>
               </TouchableOpacity>
@@ -1060,7 +1099,7 @@ export default function OrbitBlocksApp() {
             )}
             <TouchableOpacity
               style={styles.darkMenuBtn}
-              onPress={() => setScreen("TITLE")}
+              onPress={() => showScreen("TITLE")}
             >
               <Text style={styles.darkMenuBtnText}>🏠 {t("titleScreen")}</Text>
             </TouchableOpacity>

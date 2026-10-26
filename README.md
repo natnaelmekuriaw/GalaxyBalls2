@@ -21,12 +21,26 @@ from level 1, including horizontal and vertical lines and four corner orientatio
 Single-block specials still appear during play. The preview shows the exact queued
 shape and colors. Four-block experiments remain disabled.
 
+## Sound effects
+
+Short original effects play for menus, game start, movement, rotation, landing,
+stones, matches, cascades, bomb/flash/star pieces, level changes, and game over.
+Open **Settings → Sound effects** to mute or enable them; **Test sound** plays a
+short preview. This preference lasts for the current session until local saving
+is added. Sounds stop when the app backgrounds or the player pauses the game.
+Device silent mode and media volume are respected. No microphone permission is needed.
+
+The small PCM WAV sound pack is bundled for offline playback. Rebuild it with
+`npm run sounds:build`. Audio uses `expo-audio`; rebuild an existing development
+client once after adding this native package. Expo Go must match SDK 58.
+
 ## Checks
 
 ```sh
 npm run lint
 npx tsc --noEmit
 node --experimental-strip-types --test tests/translations.test.mjs
+npm run test:sounds
 ```
 
 To check the interface, run `npm run web`, choose each language in Settings, and visit

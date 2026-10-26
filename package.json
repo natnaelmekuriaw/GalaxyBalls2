@@ -5,6 +5,7 @@
   "dependencies": {
     "@expo/ui": "~58.0.23",
     "expo": "^58.0.19",
+    "expo-audio": "~58.0.10",
     "expo-constants": "~58.0.13",
     "expo-device": "~58.0.5",
     "expo-font": "~58.0.10",
@@ -34,6 +35,8 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "sounds:build": "node scripts/generate-sounds.cjs",
+    "test:sounds": "node --experimental-strip-types --test tests/sounds.test.mjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
