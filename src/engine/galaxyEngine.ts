@@ -203,6 +203,29 @@ export function cloneGrid(grid: Cell[][]): Cell[][] {
   return grid.map((row) => row.map((cell) => ({ ...cell })));
 }
 
+export function getPiecePreview(piece: ActivePiece): Cell[][] {
+  const preview: Cell[][] = Array.from({ length: PREVIEW_SIZE }, () =>
+    Array.from({ length: PREVIEW_SIZE }, () => ({ kind: "EMPTY" }))
+  );
+  if (piece.cells.length === 0) return preview;
+
+  const minX = Math.min(...piece.cells.map((cell) => cell.dx));
+  const minY = Math.min(...piece.cells.map((cell) => cell.dy));
+  const width = Math.max(...piece.cells.map((cell) => cell.dx)) - minX + 1;
+  const height = Math.max(...piece.cells.map((cell) => cell.dy)) - minY + 1;
+  const offsetX = Math.floor((PREVIEW_SIZE - width) / 2) - minX;
+  const offsetY = Math.floor((PREVIEW_SIZE - height) / 2) - minY;
+
+  for (const cell of piece.cells) {
+    const col = cell.dx + offsetX;
+    const row = cell.dy + offsetY;
+    if (row >= 0 && row < PREVIEW_SIZE && col >= 0 && col < PREVIEW_SIZE) {
+      preview[row][col] = { kind: cell.kind, colorId: cell.colorId };
+    }
+  }
+  return preview;
+}
+
 export function generatePiece(
   config: GameConfig,
   level: number,
