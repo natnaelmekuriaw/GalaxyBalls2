@@ -58,7 +58,7 @@ export function CustomTabList(props: TabListProps) {
   const { t } = useLanguage();
 
   return (
-    <View {...props} style={styles.tabListContainer}>
+    <View {...props} pointerEvents="box-none" style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
         <ThemedText type="smallBold" style={styles.brandText}>
           Galaxy Balls
