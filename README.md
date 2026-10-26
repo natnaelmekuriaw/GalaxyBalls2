@@ -25,7 +25,7 @@ shape and colors. Four-block experiments remain disabled.
 
 Short original effects play for menus, game start, movement, rotation, landing,
 stones, matches, cascades, bomb/flash/star pieces, level changes, and game over.
-Open **Settings → Sound effects** to mute or enable them; **Test sound** plays a
+Open **Settings → Game audio** to mute or enable them; **Test sound** plays a
 short preview. This preference lasts for the current session until local saving
 is added. Sounds stop when the app backgrounds or the player pauses the game.
 Device silent mode and media volume are respected. No microphone permission is needed.
@@ -33,6 +33,23 @@ Device silent mode and media volume are respected. No microphone permission is n
 The small PCM WAV sound pack is bundled for offline playback. Rebuild it with
 `npm run sounds:build`. Audio uses `expo-audio`; rebuild an existing development
 client once after adding this native package. Expo Go must match SDK 58.
+
+The home screen has a looping original menu theme and a music button. On web,
+tap that button or open a menu to start music after the required user interaction.
+On mobile, menu music starts automatically when audio is enabled. It stops during
+gameplay and in the background. **Game audio** mutes all audio; **Menu music**
+controls just the theme. Both controls are available in Settings.
+
+Correct matching plays a clear or cascade effect. When that match advances a
+level, its clear sound finishes before the victory jingle. Game over plays a
+distinct loss sound. Runs are endless survival, so victory feedback marks a level
+advance rather than a final win screen.
+
+## Game modes
+
+- **Classic:** slower falling, no landing guide, and no instant drop.
+- **Quick Play** (previously Comfort): faster falling, a landing guide, and an
+  instant-drop button. Existing scores keep their original mode identifier.
 
 ## Checks
 

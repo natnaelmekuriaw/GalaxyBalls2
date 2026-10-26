@@ -16,7 +16,7 @@ const SOURCES: Record<SoundCue, AudioSource> = {
   bomb: require('../../assets/sounds/bomb.wav'),
   flash: require('../../assets/sounds/flash.wav'),
   star: require('../../assets/sounds/star.wav'),
-  levelUp: require('../../assets/sounds/level-up.wav'),
+  win: require('../../assets/sounds/win.wav'),
   gameOver: require('../../assets/sounds/game-over.wav'),
 };
 
@@ -62,6 +62,7 @@ export function useGameSounds(enabled: boolean) {
   }, [enabled]);
 
   const play = useCallback((cue: SoundCue) => controllerRef.current?.play(cue) ?? false, []);
+  const playSequence = useCallback((cues: SoundCue[]) => controllerRef.current?.playSequence(cues), []);
   const stop = useCallback(() => controllerRef.current?.stop(), []);
-  return { play, stop };
+  return { play, playSequence, stop };
 }

@@ -18,8 +18,11 @@ const effects = {
   bomb: [note(140, 0.3, 'noise', 0.45, 35)],
   flash: [note(1800, 0.19, 'square', 0.24, 250)],
   star: [note(784, 0.06, 'sine'), note(987.77, 0.06, 'sine'), note(1174.66, 0.06, 'sine'), note(1568, 0.16, 'sine')],
-  levelUp: [note(392, 0.06), note(523.25, 0.06), note(659.25, 0.06), note(784, 0.06), note(1046.5, 0.18)],
+  win: [note(523.25, 0.08), note(659.25, 0.08), note(784, 0.08), note(1046.5, 0.22)],
   gameOver: [note(523.25, 0.09, 'triangle'), note(392, 0.09, 'triangle'), note(293.66, 0.09, 'triangle'), note(196, 0.2, 'triangle')],
+  menu: [523.25, 659.25, 784, 659.25, 440, 523.25, 659.25, 523.25,
+    392, 523.25, 659.25, 784, 698.46, 659.25, 523.25, 392].map((pitch, index) =>
+    note(pitch, index % 4 === 3 ? 0.4 : 0.2, 'triangle', 0.066)),
 };
 
 function synthesize(notes) {
