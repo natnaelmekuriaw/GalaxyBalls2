@@ -10,7 +10,6 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   Vibration,
   View,
@@ -36,6 +35,9 @@ import {
   stepGravityTick,
 } from "../engine/galaxyEngine";
 import { runAllEngineTests } from "../engine/galaxyEngine.test";
+import { GameText as Text } from "../components/game-text";
+import { useLanguage } from "../i18n/LanguageProvider";
+import { LANGUAGES } from "../i18n/translations";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -206,8 +208,22 @@ function UfoCompetitorAvatar({
   );
 }
 
+function snapshotEngineState(state: EngineState): EngineState {
+  const copyPiece = (piece: EngineState["nextPiece"]) => ({
+    ...piece,
+    cells: piece.cells.map((cell) => ({ ...cell })),
+  });
+  return {
+    ...state,
+    grid: state.grid.map((row) => row.map((cell) => ({ ...cell }))),
+    activePiece: state.activePiece ? copyPiece(state.activePiece) : null,
+    nextPiece: copyPiece(state.nextPiece),
+  };
+}
+
 export default function OrbitBlocksApp() {
   const navigation = useNavigation();
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     navigation.setOptions({
@@ -222,19 +238,18 @@ export default function OrbitBlocksApp() {
   const [gameState, setGameState] = useState<EngineState>(() =>
     createNewGameState("CLASSIC")
   );
-  const [, setTickCount] = useState(0);
 
-  const animX = useRef(new Animated.Value(2 * CELL_SIZE)).current;
-  const animY = useRef(new Animated.Value(0)).current;
-  const mascotJumpAnim = useRef(new Animated.Value(0)).current;
+  const [animX] = useState(() => new Animated.Value(2 * CELL_SIZE));
+  const [animY] = useState(() => new Animated.Value(0));
+  const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
-  const [highContrast, setHighContrast] = useState(false);
+  const highContrast = false;
   const [rotationStrategy, setRotationStrategy] = useState<
     "GEOMETRY_90" | "COLOR_CYCLE"
   >("GEOMETRY_90");
-  const [experimental4Block, setExperimental4Block] = useState(false);
+  const experimental4Block = false;
 
   const [highScores, setHighScores] = useState<
     Record<GameMode, HighScoreEntry[]>
@@ -254,11 +269,13 @@ export default function OrbitBlocksApp() {
   const [testReport, setTestReport] = useState<string[] | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
   const stateRef = useRef<EngineState>(gameState);
-  stateRef.current = gameState;
 
-  const forceRender = useCallback(() => setTickCount((t) => t + 1), []);
+  const forceRender = useCallback(() => {
+    setGameState(snapshotEngineState(stateRef.current));
+  }, []);
 
   useEffect(() => {
+    if (screen === "GAME" && gameState.status !== "PLAYING") return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(mascotJumpAnim, {
@@ -277,7 +294,7 @@ export default function OrbitBlocksApp() {
     );
     loop.start();
     return () => loop.stop();
-  }, [mascotJumpAnim]);
+  }, [mascotJumpAnim, screen, gameState.status]);
 
   const triggerHaptic = useCallback(
     (ms = 25) => {
@@ -352,7 +369,11 @@ export default function OrbitBlocksApp() {
   }, [forceRender]);
 
   useEffect(() => {
-    if (screen !== "GAME" || gameState.status !== "PLAYING") return;
+    if (screen !== "GAME" || gameState.status !== "PLAYING") {
+      animX.stopAnimation();
+      animY.stopAnimation();
+      return;
+    }
     const intervalMs = getFallIntervalMs(gameState.config, gameState.level);
 
     syncSmoothPieceAnimation(stateRef.current, true);
@@ -366,13 +387,13 @@ export default function OrbitBlocksApp() {
       if (summary) {
         if (summary.stoneLanded) triggerHaptic(65);
         if (summary.specialTriggered) {
-          setBannerText(`${summary.specialTriggered} BLAST!`);
+          setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
           triggerHaptic(50);
         } else if (summary.chainDepth >= 2) {
-          setBannerText(`${summary.chainDepth}x CASCADE!`);
+          setBannerText(t("cascade", { count: summary.chainDepth }));
           triggerHaptic(40);
         } else if (summary.levelUp) {
-          setBannerText(`LEVEL ${s.level}!`);
+          setBannerText(t("levelUp", { level: s.level }));
         } else if (summary.clearedCount > 0) {
           setBannerText(`+${summary.scoreDelta}`);
           triggerHaptic(20);
@@ -397,6 +418,9 @@ export default function OrbitBlocksApp() {
     triggerHaptic,
     recordHighScore,
     syncSmoothPieceAnimation,
+    t,
+    animX,
+    animY,
   ]);
 
   useEffect(() => {
@@ -410,7 +434,8 @@ export default function OrbitBlocksApp() {
       rotationMode: rotationStrategy,
       experimentalFourBlockPieces: experimental4Block,
     });
-    setGameState(fresh);
+    stateRef.current = fresh;
+    setGameState(snapshotEngineState(fresh));
     if (fresh.activePiece) {
       animX.setValue(fresh.activePiece.x * CELL_SIZE);
       animY.setValue(fresh.activePiece.y * CELL_SIZE);
@@ -419,10 +444,11 @@ export default function OrbitBlocksApp() {
   };
 
   const handleMoveLeft = () => {
-    if (movePiece(gameState, -1, 0)) {
+    const state = stateRef.current;
+    if (movePiece(state, -1, 0)) {
       triggerHaptic(10);
       Animated.timing(animX, {
-        toValue: gameState.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x * CELL_SIZE,
         duration: 80,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
@@ -432,10 +458,11 @@ export default function OrbitBlocksApp() {
   };
 
   const handleMoveRight = () => {
-    if (movePiece(gameState, 1, 0)) {
+    const state = stateRef.current;
+    if (movePiece(state, 1, 0)) {
       triggerHaptic(10);
       Animated.timing(animX, {
-        toValue: gameState.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x * CELL_SIZE,
         duration: 80,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
@@ -445,10 +472,11 @@ export default function OrbitBlocksApp() {
   };
 
   const handleRotate = () => {
-    if (rotateActivePiece(gameState)) {
+    const state = stateRef.current;
+    if (rotateActivePiece(state)) {
       triggerHaptic(15);
       Animated.timing(animX, {
-        toValue: gameState.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x * CELL_SIZE,
         duration: 60,
         useNativeDriver: true,
       }).start();
@@ -457,7 +485,7 @@ export default function OrbitBlocksApp() {
   };
 
   const handleSoftDrop = () => {
-    const s = gameState;
+    const s = stateRef.current;
     const summary = stepGravityTick(s);
     if (summary?.gameOver) {
       recordHighScore(s.config.mode, s.score, s.level);
@@ -468,13 +496,14 @@ export default function OrbitBlocksApp() {
   };
 
   const handleHardDrop = () => {
-    if (!gameState.config.allowHardDrop || !gameState.activePiece) return;
-    gameState.activePiece.y = getGhostY(gameState.grid, gameState.activePiece);
-    const summary = lockActivePieceAndResolve(gameState);
+    const state = stateRef.current;
+    if (state.status !== "PLAYING" || !state.config.allowHardDrop || !state.activePiece) return;
+    state.activePiece.y = getGhostY(state.grid, state.activePiece);
+    const summary = lockActivePieceAndResolve(state);
     if (summary.gameOver) {
-      recordHighScore(gameState.config.mode, gameState.score, gameState.level);
+      recordHighScore(state.config.mode, state.score, state.level);
     }
-    syncSmoothPieceAnimation(gameState, true);
+    syncSmoothPieceAnimation(state, true);
     triggerHaptic(45);
     forceRender();
   };
@@ -596,32 +625,32 @@ export default function OrbitBlocksApp() {
             style={styles.goldMenuBtn}
             onPress={() => startNewGame("CLASSIC")}
           >
-            <Text style={styles.goldMenuBtnText}>▶ PLAY CLASSIC (6×10)</Text>
+            <Text style={styles.goldMenuBtnText}>▶ {t("playClassic")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.darkMenuBtn}
             onPress={() => startNewGame("COMFORT")}
           >
-            <Text style={styles.darkMenuBtnText}>⚡ MODERN COMFORT MODE</Text>
+            <Text style={styles.darkMenuBtnText}>⚡ {t("playComfort")}</Text>
           </TouchableOpacity>
           <View style={styles.menuRow}>
             <TouchableOpacity
               style={styles.halfBtn}
               onPress={() => setScreen("HOWTO")}
             >
-              <Text style={styles.halfBtnText}>📖 RULES</Text>
+              <Text style={styles.halfBtnText}>📖 {t("rules")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.halfBtn}
               onPress={() => setScreen("HIGHSCORES")}
             >
-              <Text style={styles.halfBtnText}>🏆 TOP 5</Text>
+              <Text style={styles.halfBtnText}>🏆 {t("topFive")}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.halfBtn}
               onPress={() => setScreen("SETTINGS")}
             >
-              <Text style={styles.halfBtnText}>⚙️ SETUP</Text>
+              <Text style={styles.halfBtnText}>⚙️ {t("setup")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -635,28 +664,26 @@ export default function OrbitBlocksApp() {
         style={styles.modalScreen}
         contentContainerStyle={styles.modalContent}
       >
-        <Text style={styles.sectionHeader}>📖 HOW TO PLAY</Text>
+        <Text style={styles.sectionHeader}>📖 {t("howToPlay")}</Text>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>1. 4-Axis Match-Three</Text>
+          <Text style={styles.infoTitle}>{t("matchTitle")}</Text>
+          <Text style={styles.infoBody}>{t("matchRules")}</Text>
+        </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>{t("specialsTitle")}</Text>
           <Text style={styles.infoBody}>
-            Connect 3 or more blocks of the SAME color horizontally, vertically,
-            or diagonally. Full rows do not clear unless colors match!
+            {t("stoneRules")}{"\n"}{t("bombRules")}{"\n"}{t("flashRules")}{"\n"}{t("starRules")}
           </Text>
         </View>
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>2. Stones & Special Blocks</Text>
-          <Text style={styles.infoBody}>
-            • 🪨 STONE: Heavy dark obstacle. Cannot be matched—clear with Bomb
-            or Flash!{"\n"}• 💣 BOMB: Destroys surrounding 3×3 blocks on impact.
-            {"\n"}• ⚡ FLASH: Clears the entire vertical column.{"\n"}• ⭐ STAR:
-            Clears all normal blocks of the color it lands on.
-          </Text>
+          <Text style={styles.infoTitle}>{t("controlsTitle")}</Text>
+          <Text style={styles.infoBody}>{t("controlsRules")}</Text>
         </View>
         <TouchableOpacity
           style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -668,17 +695,17 @@ export default function OrbitBlocksApp() {
         style={styles.modalScreen}
         contentContainerStyle={styles.modalContent}
       >
-        <Text style={styles.sectionHeader}>🏆 TOP 5 HIGH SCORES</Text>
+        <Text style={styles.sectionHeader}>🏆 {t("highScores")}</Text>
         {(["CLASSIC", "COMFORT"] as GameMode[]).map((mode) => (
           <View key={mode} style={styles.infoCard}>
-            <Text style={styles.infoTitle}>{mode} MODE</Text>
+            <Text style={styles.infoTitle}>{t(mode === "CLASSIC" ? "classic" : "comfort")}</Text>
             {highScores[mode].map((entry, idx) => (
               <View key={idx} style={styles.scoreRow}>
                 <Text style={styles.scoreRank}>
                   #{idx + 1} {entry.alias}
                 </Text>
                 <Text style={styles.scoreVal}>
-                  {entry.score} pts (Lv.{entry.level})
+                  {t("scoreEntry", { score: entry.score, level: entry.level })}
                 </Text>
               </View>
             ))}
@@ -688,7 +715,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -700,23 +727,44 @@ export default function OrbitBlocksApp() {
         style={styles.modalScreen}
         contentContainerStyle={styles.modalContent}
       >
-        <Text style={styles.sectionHeader}>⚙️ SETTINGS & TESTS</Text>
+        <Text style={styles.sectionHeader}>⚙️ {t("settings")}</Text>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>{t("language")}</Text>
+          <Text style={styles.infoBody}>{t("languageHint")}</Text>
+          <View accessibilityRole="radiogroup" accessibilityLabel={t("language")} style={styles.languageOptions}>
+            {LANGUAGES.map((option) => (
+              <TouchableOpacity
+                key={option.code}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: language === option.code }}
+                aria-checked={language === option.code}
+                accessibilityLabel={option.label}
+                style={[styles.languageOption, language === option.code && styles.languageSelected]}
+                onPress={() => setLanguage(option.code)}
+              >
+                <Text style={styles.languageLabel}>
+                  {language === option.code ? "●" : "○"} {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => setHapticsEnabled(!hapticsEnabled)}
         >
-          <Text style={styles.toggleLabel}>Vibration / Haptics</Text>
+          <Text style={styles.toggleLabel}>{t("haptics")}</Text>
           <Text style={styles.toggleValue}>
-            {hapticsEnabled ? "ON" : "OFF"}
+            {t(hapticsEnabled ? "on" : "off")}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
           onPress={() => setColorblindGlyphs(!colorblindGlyphs)}
         >
-          <Text style={styles.toggleLabel}>Inner Block Emblems</Text>
+          <Text style={styles.toggleLabel}>{t("emblems")}</Text>
           <Text style={styles.toggleValue}>
-            {colorblindGlyphs ? "ON" : "OFF"}
+            {t(colorblindGlyphs ? "on" : "off")}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -727,8 +775,8 @@ export default function OrbitBlocksApp() {
             )
           }
         >
-          <Text style={styles.toggleLabel}>Rotation Mode</Text>
-          <Text style={styles.toggleValue}>{rotationStrategy}</Text>
+          <Text style={styles.toggleLabel}>{t("rotationMode")}</Text>
+          <Text style={styles.toggleValue}>{t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.darkMenuBtn}
@@ -737,7 +785,7 @@ export default function OrbitBlocksApp() {
             setTestReport(res.log);
           }}
         >
-          <Text style={styles.darkMenuBtnText}>🧪 RUN ENGINE UNIT TESTS</Text>
+          <Text style={styles.darkMenuBtnText}>🧪 {t("runTests")}</Text>
         </TouchableOpacity>
         {testReport && (
           <View style={styles.infoCard}>
@@ -752,7 +800,7 @@ export default function OrbitBlocksApp() {
           style={styles.goldMenuBtn}
           onPress={() => setScreen("TITLE")}
         >
-          <Text style={styles.goldMenuBtnText}>◀ BACK TO TITLE</Text>
+          <Text style={styles.goldMenuBtnText}>◀ {t("backToTitle")}</Text>
         </TouchableOpacity>
       </ScrollView>
     );
@@ -772,14 +820,15 @@ export default function OrbitBlocksApp() {
   return (
     <View style={styles.playScreen}>
       <View style={styles.orangeScoreHeader}>
-        <Text style={styles.orangeHeaderText}>
-          Score {gameState.score} High {topHighScore}
+          <Text style={styles.orangeHeaderText} adjustsFontSizeToFit minimumFontScale={0.65} numberOfLines={1}>
+          {t("score")} {gameState.score} · {t("high")} {topHighScore}
         </Text>
         <TouchableOpacity
           style={styles.headerPausePill}
+          accessibilityLabel={t("pause")}
           onPress={() => {
-            gameState.status =
-              gameState.status === "PAUSED" ? "PLAYING" : "PAUSED";
+            stateRef.current.status =
+              stateRef.current.status === "PAUSED" ? "PLAYING" : "PAUSED";
             forceRender();
           }}
         >
@@ -791,7 +840,7 @@ export default function OrbitBlocksApp() {
 
       <View style={styles.spaceSkyBanner}>
         <Text style={styles.spaceSkyStars}>
-          ✦ * · ★ {bannerText || `LV.${gameState.level}`} · ✦
+          ✦ * · ★ {bannerText || t("level", { level: gameState.level })} · ✦
         </Text>
       </View>
 
@@ -939,7 +988,7 @@ export default function OrbitBlocksApp() {
           onPress={handleMoveLeft}
         >
           <Text style={styles.ctrlBtnText}>◀</Text>
-          <Text style={styles.ctrlSubLabel}>LEFT</Text>
+          <Text style={styles.ctrlSubLabel}>{t("left")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ctrlBtn}
@@ -947,7 +996,7 @@ export default function OrbitBlocksApp() {
           onPress={handleRotate}
         >
           <Text style={styles.ctrlBtnText}>↻</Text>
-          <Text style={styles.ctrlSubLabel}>ROTATE</Text>
+          <Text style={styles.ctrlSubLabel}>{t("rotate")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ctrlBtn}
@@ -955,7 +1004,7 @@ export default function OrbitBlocksApp() {
           onPress={handleSoftDrop}
         >
           <Text style={styles.ctrlBtnText}>▼</Text>
-          <Text style={styles.ctrlSubLabel}>DOWN</Text>
+          <Text style={styles.ctrlSubLabel}>{t("down")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ctrlBtn}
@@ -963,7 +1012,7 @@ export default function OrbitBlocksApp() {
           onPress={handleMoveRight}
         >
           <Text style={styles.ctrlBtnText}>▶</Text>
-          <Text style={styles.ctrlSubLabel}>RIGHT</Text>
+          <Text style={styles.ctrlSubLabel}>{t("right")}</Text>
         </TouchableOpacity>
         {gameState.config.allowHardDrop && (
           <TouchableOpacity
@@ -972,7 +1021,7 @@ export default function OrbitBlocksApp() {
             onPress={handleHardDrop}
           >
             <Text style={styles.ctrlBtnText}>⏬</Text>
-            <Text style={styles.ctrlSubLabel}>DROP</Text>
+            <Text style={styles.ctrlSubLabel}>{t("drop")}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -987,34 +1036,34 @@ export default function OrbitBlocksApp() {
         <View style={styles.overlayBackdrop}>
           <View style={styles.overlayCard}>
             <Text style={styles.overlayTitle}>
-              {gameState.status === "GAME_OVER" ? "GAME OVER" : "PAUSED"}
+              {t(gameState.status === "GAME_OVER" ? "gameOver" : "paused")}
             </Text>
             <Text style={styles.overlayScore}>
-              Score: {gameState.score} | High: {topHighScore}
+              {t("score")}: {gameState.score} · {t("high")}: {topHighScore}
             </Text>
             {gameState.status === "PAUSED" ? (
               <TouchableOpacity
                 style={styles.goldMenuBtn}
                 onPress={() => {
-                  gameState.status = "PLAYING";
+                  stateRef.current.status = "PLAYING";
                   forceRender();
                 }}
               >
-                <Text style={styles.goldMenuBtnText}>▶ RESUME</Text>
+                <Text style={styles.goldMenuBtnText}>▶ {t("resume")}</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
                 style={styles.goldMenuBtn}
                 onPress={() => startNewGame(gameState.config.mode)}
               >
-                <Text style={styles.goldMenuBtnText}>🔄 PLAY AGAIN</Text>
+                <Text style={styles.goldMenuBtnText}>🔄 {t("playAgain")}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
               style={styles.darkMenuBtn}
               onPress={() => setScreen("TITLE")}
             >
-              <Text style={styles.darkMenuBtnText}>🏠 TITLE SCREEN</Text>
+              <Text style={styles.darkMenuBtnText}>🏠 {t("titleScreen")}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1126,6 +1175,7 @@ const styles = StyleSheet.create({
     color: "#1C1917",
     fontSize: 16,
     fontWeight: "900",
+    textAlign: "center",
   },
   darkMenuBtn: {
     backgroundColor: "#1E293B",
@@ -1140,6 +1190,7 @@ const styles = StyleSheet.create({
     color: "#FDE68A",
     fontSize: 14,
     fontWeight: "800",
+    textAlign: "center",
   },
   menuRow: {
     flexDirection: "row",
@@ -1158,11 +1209,12 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
     fontSize: 12,
     fontWeight: "800",
+    textAlign: "center",
   },
   playScreen: {
     flex: 1,
     backgroundColor: "#020518",
-    paddingTop: Platform.OS === "ios" ? 48 : 34,
+    paddingTop: Platform.OS === "ios" ? 48 : Platform.OS === "web" ? 70 : 34,
     paddingBottom: 14,
     justifyContent: "space-between",
   },
@@ -1179,6 +1231,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   orangeHeaderText: {
+    flex: 1,
     color: "#1A1105",
     fontSize: 22,
     fontWeight: "900",
@@ -1560,6 +1613,7 @@ const styles = StyleSheet.create({
     color: "#FDE68A",
     fontSize: 9,
     fontWeight: "800",
+    textAlign: "center",
   },
   overlayBackdrop: {
     flex: 1,
@@ -1624,6 +1678,8 @@ const styles = StyleSheet.create({
   },
   scoreRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
     justifyContent: "space-between",
     paddingVertical: 4,
     borderBottomWidth: 0.5,
@@ -1645,13 +1701,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#334155",
+    alignItems: "center",
+    minHeight: 52,
+    gap: 12,
   },
   toggleLabel: {
+    flex: 1,
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
   },
   toggleValue: {
+    flex: 1,
+    textAlign: "right",
     color: "#F59B1A",
     fontSize: 14,
     fontWeight: "900",
@@ -1660,5 +1722,26 @@ const styles = StyleSheet.create({
     color: "#4ADE80",
     fontSize: 12,
     fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  languageOptions: {
+    gap: 8,
+    marginTop: 6,
+  },
+  languageOption: {
+    minHeight: 48,
+    padding: 12,
+    justifyContent: "center",
+    backgroundColor: "#1E293B",
+    borderWidth: 1,
+    borderColor: "#475569",
+    borderRadius: 8,
+  },
+  languageSelected: {
+    backgroundColor: "#3B2B12",
+    borderColor: "#F59B1A",
+  },
+  languageLabel: {
+    color: "#F8FAFC",
+    fontSize: 16,
   },
 });
