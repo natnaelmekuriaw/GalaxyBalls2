@@ -4,6 +4,10 @@ import {
   findMatches,
   GRID_COLS,
   GRID_ROWS,
+  getPiecePreview,
+  generatePiece,
+  getGhostY,
+  type ActivePiece,
   lockActivePieceAndResolve,
   movePiece,
   resolveCascades,
@@ -179,6 +183,67 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
     record(
       "7, 8 & 9. Collision boundaries, rotation, and spawn Game Over verified"
     );
+  }
+
+  // Each preview block corresponds to exactly one queued block.
+  {
+    const shapes: ActivePiece["cells"][] = [
+      [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 0 }, { dx: 0, dy: 1, kind: "NORMAL", colorId: 1 }],
+      [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 1 }, { dx: 1, dy: 0, kind: "STONE" }],
+      [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 0 }, { dx: 0, dy: 1, kind: "NORMAL", colorId: 1 }, { dx: 0, dy: 2, kind: "NORMAL", colorId: 2 }],
+      [{ dx: 0, dy: 1, kind: "NORMAL", colorId: 2 }, { dx: 1, dy: 0, kind: "NORMAL", colorId: 3 }, { dx: 1, dy: 1, kind: "NORMAL", colorId: 4 }],
+      [{ dx: -1, dy: 0, kind: "NORMAL", colorId: 0 }, { dx: 0, dy: 0, kind: "NORMAL", colorId: 1 }, { dx: 1, dy: 0, kind: "NORMAL", colorId: 2 }],
+      [{ dx: 0, dy: 0, kind: "BOMB" }],
+      [{ dx: 0, dy: 0, kind: "FLASH" }],
+      [{ dx: 0, dy: 0, kind: "STAR" }],
+    ];
+    for (const cells of shapes) {
+      const piece: ActivePiece = { x: 2, y: 0, cells, isSingleSpecial: cells.length === 1 };
+      const original = JSON.stringify(piece);
+      const preview = getPiecePreview(piece);
+      const occupied = preview.flat().filter((cell) => cell.kind !== "EMPTY");
+      assert(occupied.length === cells.length, "Preview must not duplicate or omit blocks");
+      for (const cell of cells) {
+        const matches = occupied.filter((shown) => shown.kind === cell.kind && shown.colorId === cell.colorId);
+        assert(matches.length === 1, "Preview must preserve each block's color and type");
+      }
+      const minX = Math.min(...cells.map((cell) => cell.dx));
+      const minY = Math.min(...cells.map((cell) => cell.dy));
+      const firstRow = preview.findIndex((row) => row.some((cell) => cell.kind !== "EMPTY"));
+      const firstCol = Math.min(...preview.flatMap((row) => row.flatMap((cell, col) => cell.kind !== "EMPTY" ? [col] : [])));
+      for (const cell of cells) {
+        const shown = preview[firstRow + cell.dy - minY][firstCol + cell.dx - minX];
+        assert(shown.kind === cell.kind && shown.colorId === cell.colorId, "Preview must preserve shape and color positions");
+      }
+      assert(JSON.stringify(piece) === original, "Rendering a preview must not change its queued piece");
+    }
+    record("10. Preview preserves block counts, shapes, colors, and special pieces");
+  }
+
+  // The exact previewed colors and shape must survive the queue-to-board handoff.
+  {
+    let sawThreeBlockPiece = false;
+    for (const level of [1, 2, 5]) {
+      for (let seed = 1; seed <= 64; seed++) {
+        const state = createNewGameState("CLASSIC", {}, seed);
+        state.level = level;
+        state.score = (level - 1) * 180;
+        state.nextPiece = generatePiece(state.config, level, state.seed, 0).piece;
+        const expectedCells = JSON.stringify(state.nextPiece.cells);
+        const expectedPreview = JSON.stringify(getPiecePreview(state.nextPiece));
+        if (!state.nextPiece.isSingleSpecial && level === 1) {
+          assert(state.nextPiece.cells.length === 2, "Level 1 should start with two-block groups");
+        }
+        if (state.nextPiece.cells.length === 3) sawThreeBlockPiece = true;
+        state.activePiece!.y = getGhostY(state.grid, state.activePiece!);
+        const summary = lockActivePieceAndResolve(state);
+        assert(!summary.gameOver && state.activePiece !== null, "Queued piece should spawn on a clear board");
+        assert(JSON.stringify(state.activePiece!.cells) === expectedCells, "Spawned piece must have the previewed blocks, colors, and offsets");
+        assert(JSON.stringify(getPiecePreview(state.activePiece!)) === expectedPreview, "Queued and spawned previews must be identical");
+      }
+    }
+    assert(sawThreeBlockPiece, "Three-block groups should be available from level 2");
+    record("11. Previewed pieces spawn unchanged across early and later levels");
   }
 
   return { passed, log };
