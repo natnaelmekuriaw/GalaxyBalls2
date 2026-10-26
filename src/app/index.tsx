@@ -24,11 +24,11 @@ import {
   MASCOTS,
   MascotInfo,
   MascotMood,
-  PREVIEW_SIZE,
   canPlacePiece,
   createNewGameState,
   getFallIntervalMs,
   getGhostY,
+  getPiecePreview,
   lockActivePieceAndResolve,
   movePiece,
   rotateActivePiece,
@@ -826,6 +826,7 @@ export default function OrbitBlocksApp() {
     gameState.config.showGhostPiece && gameState.activePiece
       ? getGhostY(gameState.grid, gameState.activePiece)
       : null;
+  const nextPiecePreview = getPiecePreview(gameState.nextPiece);
 
   return (
     <View style={styles.playScreen}>
@@ -903,6 +904,7 @@ export default function OrbitBlocksApp() {
 
             {gameState.activePiece && (
               <Animated.View
+                testID="active-piece"
                 pointerEvents="none"
                 style={[
                   styles.activePieceOverlay,
@@ -940,22 +942,10 @@ export default function OrbitBlocksApp() {
           <View style={styles.previewWithBridgeRow}>
             <View style={styles.goldenBridgeTab} />
             <View style={styles.goldenPreviewFrame}>
-              <View style={styles.creamPreviewInner}>
-                {Array.from({ length: PREVIEW_SIZE }).map((_, pr) => (
+              <View testID="next-piece-preview" style={styles.creamPreviewInner}>
+                {nextPiecePreview.map((row, pr) => (
                   <View key={pr} style={styles.boardRow}>
-                    {Array.from({ length: PREVIEW_SIZE }).map((__, pc) => {
-                      const found =
-                        gameState.nextPiece.cells.find(
-                          (part) => part.dy + 1 === pr && part.dx === pc
-                        ) ||
-                        gameState.nextPiece.cells.find(
-                          (part) => part.dy === pr && part.dx === pc
-                        );
-                      const previewCell: Cell = found
-                        ? { kind: found.kind, colorId: found.colorId }
-                        : { kind: "EMPTY" };
-
-                      return (
+                    {row.map((previewCell, pc) => (
                         <View
                           key={pc}
                           style={[
@@ -972,8 +962,7 @@ export default function OrbitBlocksApp() {
                             false
                           )}
                         </View>
-                      );
-                    })}
+                    ))}
                   </View>
                 ))}
               </View>

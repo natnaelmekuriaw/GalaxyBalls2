@@ -52,7 +52,7 @@ export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
     initialFallMs: 950,
     minFallMs: 260,
     speedDecayPerLevel: 75,
-    threeBlockUnlockLevel: 2,
+    threeBlockUnlockLevel: 1,
     experimentalFourBlockPieces: false,
     rotationMode: "GEOMETRY_90",
     allowHardDrop: false,
@@ -68,7 +68,7 @@ export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
     initialFallMs: 720,
     minFallMs: 240,
     speedDecayPerLevel: 60,
-    threeBlockUnlockLevel: 2,
+    threeBlockUnlockLevel: 1,
     experimentalFourBlockPieces: false,
     rotationMode: "GEOMETRY_90",
     allowHardDrop: true,
@@ -84,7 +84,7 @@ export const MODE_CONFIGS: Record<GameMode, GameConfig> = {
     initialFallMs: 1100,
     minFallMs: 450,
     speedDecayPerLevel: 30,
-    threeBlockUnlockLevel: 3,
+    threeBlockUnlockLevel: 1,
     experimentalFourBlockPieces: false,
     rotationMode: "GEOMETRY_90",
     allowHardDrop: true,
@@ -203,11 +203,35 @@ export function cloneGrid(grid: Cell[][]): Cell[][] {
   return grid.map((row) => row.map((cell) => ({ ...cell })));
 }
 
+export function getPiecePreview(piece: ActivePiece): Cell[][] {
+  const preview: Cell[][] = Array.from({ length: PREVIEW_SIZE }, () =>
+    Array.from({ length: PREVIEW_SIZE }, () => ({ kind: "EMPTY" }))
+  );
+  if (piece.cells.length === 0) return preview;
+
+  const minX = Math.min(...piece.cells.map((cell) => cell.dx));
+  const minY = Math.min(...piece.cells.map((cell) => cell.dy));
+  const width = Math.max(...piece.cells.map((cell) => cell.dx)) - minX + 1;
+  const height = Math.max(...piece.cells.map((cell) => cell.dy)) - minY + 1;
+  const offsetX = Math.floor((PREVIEW_SIZE - width) / 2) - minX;
+  const offsetY = Math.floor((PREVIEW_SIZE - height) / 2) - minY;
+
+  for (const cell of piece.cells) {
+    const col = cell.dx + offsetX;
+    const row = cell.dy + offsetY;
+    if (row >= 0 && row < PREVIEW_SIZE && col >= 0 && col < PREVIEW_SIZE) {
+      preview[row][col] = { kind: cell.kind, colorId: cell.colorId };
+    }
+  }
+  return preview;
+}
+
 export function generatePiece(
   config: GameConfig,
   level: number,
   seed: number,
-  consecutiveHazards: number
+  consecutiveHazards: number,
+  openingBlockCount?: 2 | 3
 ): { piece: ActivePiece; nextSeed: number; nextConsecutiveHazards: number } {
   let currentSeed = seed;
   const rand = () => {
@@ -220,7 +244,7 @@ export function generatePiece(
     0.18,
     config.specialChanceBase + (level - 1) * 0.01
   );
-  if (rand() < specialChance) {
+  if (openingBlockCount === undefined && rand() < specialChance) {
     const roll = rand();
     const specialKind: CellKind =
       roll < 0.36 ? "BOMB" : roll < 0.7 ? "FLASH" : "STAR";
@@ -236,8 +260,8 @@ export function generatePiece(
     };
   }
 
-  let numBlocks = 2;
-  if (level >= config.threeBlockUnlockLevel) {
+  let numBlocks: number = openingBlockCount ?? 2;
+  if (openingBlockCount === undefined && level >= config.threeBlockUnlockLevel) {
     const threeChance = Math.min(
       0.65,
       0.35 + (level - config.threeBlockUnlockLevel) * 0.1
@@ -246,7 +270,7 @@ export function generatePiece(
       numBlocks = 3;
     }
   }
-  if (config.experimentalFourBlockPieces && level >= 4 && rand() < 0.2) {
+  if (openingBlockCount === undefined && config.experimentalFourBlockPieces && level >= 4 && rand() < 0.2) {
     numBlocks = 4;
   }
 
@@ -267,26 +291,15 @@ export function generatePiece(
             { dx: 1, dy: 0 },
           ];
   } else if (numBlocks === 3) {
-    const shapeRoll = rand();
-    if (shapeRoll < 0.35) {
-      offsets = [
-        { dx: 0, dy: 0 },
-        { dx: 0, dy: 1 },
-        { dx: 0, dy: 2 },
-      ];
-    } else if (shapeRoll < 0.65) {
-      offsets = [
-        { dx: 0, dy: 0 },
-        { dx: 1, dy: 0 },
-        { dx: 2, dy: 0 },
-      ];
-    } else {
-      offsets = [
-        { dx: 0, dy: 1 },
-        { dx: 1, dy: 0 },
-        { dx: 1, dy: 1 },
-      ];
-    }
+    const shapes = [
+      [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: 2 }],
+      [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 2, dy: 0 }],
+      [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }, { dx: 1, dy: 1 }],
+      [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }],
+      [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 1, dy: 1 }],
+      [{ dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 1, dy: 1 }],
+    ];
+    offsets = shapes[Math.floor(rand() * shapes.length)];
   } else if (numBlocks === 4) {
     offsets = [
       { dx: 0, dy: 0 },
@@ -616,12 +629,13 @@ export function createNewGameState(
   const config: GameConfig = { ...MODE_CONFIGS[mode], ...customConfig };
   const grid = createEmptyGrid();
 
-  const firstGen = generatePiece(config, 1, seed, 0);
+  const firstGen = generatePiece(config, 1, seed, 0, 2);
   const secondGen = generatePiece(
     config,
     1,
     firstGen.nextSeed,
-    firstGen.nextConsecutiveHazards
+    firstGen.nextConsecutiveHazards,
+    config.threeBlockUnlockLevel <= 1 ? 3 : 2
   );
 
   return {
