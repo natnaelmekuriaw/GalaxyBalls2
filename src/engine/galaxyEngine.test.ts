@@ -7,6 +7,8 @@ import {
   getPiecePreview,
   generatePiece,
   getGhostY,
+  canPlacePiece,
+  type GameMode,
   type ActivePiece,
   lockActivePieceAndResolve,
   movePiece,
@@ -231,9 +233,6 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
         state.nextPiece = generatePiece(state.config, level, state.seed, 0).piece;
         const expectedCells = JSON.stringify(state.nextPiece.cells);
         const expectedPreview = JSON.stringify(getPiecePreview(state.nextPiece));
-        if (!state.nextPiece.isSingleSpecial && level === 1) {
-          assert(state.nextPiece.cells.length === 2, "Level 1 should start with two-block groups");
-        }
         if (state.nextPiece.cells.length === 3) sawThreeBlockPiece = true;
         state.activePiece!.y = getGhostY(state.grid, state.activePiece!);
         const summary = lockActivePieceAndResolve(state);
@@ -242,8 +241,47 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
         assert(JSON.stringify(getPiecePreview(state.activePiece!)) === expectedPreview, "Queued and spawned previews must be identical");
       }
     }
-    assert(sawThreeBlockPiece, "Three-block groups should be available from level 2");
+    assert(sawThreeBlockPiece, "Three-block groups must be generated during normal play");
     record("11. Previewed pieces spawn unchanged across early and later levels");
+  }
+
+  // Verify the actual new-game queue without changing its score, level, or pieces.
+  {
+    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"] as GameMode[]) {
+      for (let seed = 1; seed <= 64; seed++) {
+        const state = createNewGameState(mode, {}, seed);
+        assert(state.activePiece!.cells.length === 2, "The first group should have two blocks");
+        assert(state.nextPiece.cells.length === 3, "A new game must preview three blocks immediately");
+        const expected = JSON.stringify(state.nextPiece.cells);
+        state.activePiece!.y = getGhostY(state.grid, state.activePiece!);
+        const result = lockActivePieceAndResolve(state);
+        assert(!result.gameOver, "The first drop must leave room for the queued piece");
+        assert(state.level === 1 && state.score === 0, "Piece variety must not require a score or level threshold");
+        assert(state.activePiece!.cells.length === 3, "The second falling group must have all three previewed blocks");
+        assert(JSON.stringify(state.activePiece!.cells) === expected, "The opening preview and second falling group must match exactly");
+      }
+    }
+    record("12. Every new game previews and drops a three-block piece at level 1");
+  }
+
+  {
+    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"] as GameMode[]) {
+      const config = { ...createNewGameState(mode).config, specialChanceBase: 0, stoneChanceBase: 0 };
+      const sizes = new Set<number>();
+      const shapes = new Set<string>();
+      for (let seed = 1; seed <= 1024; seed++) {
+        const piece = generatePiece(config, 1, seed, 0).piece;
+        sizes.add(piece.cells.length);
+        shapes.add(piece.cells.map(({ dx, dy }) => `${dx},${dy}`).sort().join(";"));
+        assert(canPlacePiece(createEmptyGrid(), piece), "Every generated shape must spawn within the board");
+        const previewCount = getPiecePreview(piece).flat().filter((cell) => cell.kind !== "EMPTY").length;
+        assert(previewCount === piece.cells.length, "All generated sizes and shapes must appear completely in the preview");
+      }
+      assert(sizes.has(2) && sizes.has(3), "Level 1 must mix two- and three-block groups");
+      assert(!sizes.has(4), "Four-block experiments must stay disabled by default");
+      assert(shapes.size === 8, "The generator must offer two straight pairs, two straight triples, and four corner orientations");
+    }
+    record("13. Level 1 offers mixed sizes and all eight supported shape orientations");
   }
 
   return { passed, log };

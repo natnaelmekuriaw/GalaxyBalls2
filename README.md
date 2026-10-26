@@ -13,6 +13,14 @@ Amharic uses bundled Noto Sans Ethiopic regular and bold fonts, available offlin
 Their SIL Open Font License is included in `assets/fonts/OFL.txt`.
 The translations should receive a native speaker review before release.
 
+## Piece variety
+
+Every new game starts with a two-block group and immediately previews a three-block
+group, which falls after the first group lands. Later pieces mix two and three blocks
+from level 1, including horizontal and vertical lines and four corner orientations.
+Single-block specials still appear during play. The preview shows the exact queued
+shape and colors. Four-block experiments remain disabled.
+
 ## Checks
 
 ```sh
