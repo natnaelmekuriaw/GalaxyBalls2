@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { createSoundController, SOUND_CUES } from '../src/audio/soundController.ts';
-import { getResolutionSound } from '../src/audio/soundEvents.ts';
+import { getResolutionSounds } from '../src/audio/soundEvents.ts';
+import { createNewGameState, lockActivePieceAndResolve } from '../src/engine/galaxyEngine.ts';
 
 function fakePlayer() {
   const calls = [];
   return {
     isLoaded: true,
+    duration: 0.1,
     calls,
     play() { calls.push('play'); },
     pause() { calls.push('pause'); },
@@ -84,20 +86,85 @@ test('failed audio playback does not throw into the game loop', async () => {
   await Promise.resolve();
 });
 
-test('lock events choose the correct sound, with game over and level up taking priority', () => {
+test('matches, specials, wins and losses keep distinct cues in their playback order', () => {
   const base = {
     clearedCount: 0, chainDepth: 0, scoreDelta: 0, stoneLanded: false,
     specialTriggered: null, levelUp: false, gameOver: false,
   };
-  assert.equal(getResolutionSound(base), 'land');
-  assert.equal(getResolutionSound({ ...base, stoneLanded: true }), 'stone');
-  assert.equal(getResolutionSound({ ...base, clearedCount: 3 }), 'clear');
-  assert.equal(getResolutionSound({ ...base, clearedCount: 6, chainDepth: 2 }), 'cascade');
+  assert.deepEqual(getResolutionSounds(base), ['land']);
+  assert.deepEqual(getResolutionSounds({ ...base, stoneLanded: true }), ['stone']);
+  assert.deepEqual(getResolutionSounds({ ...base, clearedCount: 3 }), ['clear']);
+  assert.deepEqual(getResolutionSounds({ ...base, clearedCount: 6, chainDepth: 2 }), ['cascade']);
   for (const kind of ['BOMB', 'FLASH', 'STAR']) {
-    assert.equal(getResolutionSound({ ...base, specialTriggered: kind }), kind.toLowerCase());
+    assert.deepEqual(getResolutionSounds({ ...base, specialTriggered: kind }), [kind.toLowerCase()]);
   }
-  assert.equal(getResolutionSound({ ...base, clearedCount: 3, levelUp: true }), 'levelUp');
-  assert.equal(getResolutionSound({ ...base, levelUp: true, gameOver: true }), 'gameOver');
+  assert.deepEqual(getResolutionSounds({ ...base, clearedCount: 3, levelUp: true }), ['clear', 'win']);
+  assert.deepEqual(getResolutionSounds({ ...base, specialTriggered: 'FLASH', chainDepth: 2, levelUp: true }), ['flash', 'cascade', 'win']);
+  assert.deepEqual(getResolutionSounds({ ...base, levelUp: true, gameOver: true }), ['gameOver']);
+});
+
+test('a real matching clear plays its pop before a victory cue when the level advances', () => {
+  for (const score of [0, 150]) {
+    const state = createNewGameState('CLASSIC', {}, 123);
+    state.score = score;
+    state.grid[9][0] = { kind: 'NORMAL', colorId: 1 };
+    state.grid[9][1] = { kind: 'NORMAL', colorId: 1 };
+    state.activePiece = { x: 2, y: 9, cells: [{ dx: 0, dy: 0, kind: 'NORMAL', colorId: 1 }], isSingleSpecial: false };
+    const summary = lockActivePieceAndResolve(state);
+    assert.equal(summary.clearedCount, 3);
+    assert.deepEqual(getResolutionSounds(summary), score === 150 ? ['clear', 'win'] : ['clear']);
+  }
+});
+
+test('an actual blocked spawn selects the loss sound', () => {
+  const state = createNewGameState('CLASSIC', {}, 123);
+  for (const row of state.grid) for (const col of [2, 3, 4]) row[col] = { kind: 'STONE' };
+  state.activePiece = { x: 0, y: 9, cells: [{ dx: 0, dy: 0, kind: 'NORMAL', colorId: 1 }], isSingleSpecial: false };
+  const summary = lockActivePieceAndResolve(state);
+  assert.equal(summary.gameOver, true);
+  assert.deepEqual(getResolutionSounds(summary), ['gameOver']);
+});
+
+function fakeScheduler() {
+  let id = 0;
+  const jobs = new Map();
+  return {
+    jobs,
+    set(callback, delay) { jobs.set(++id, { callback, delay }); return id; },
+    clear(timer) { jobs.delete(timer); },
+  };
+}
+
+test('a clear and victory play in sequence without masking the clear', () => {
+  const clear = fakePlayer();
+  const win = fakePlayer();
+  const scheduler = fakeScheduler();
+  const controller = createSoundController({ clear, win }, Date.now, scheduler);
+  controller.setEnabled(true);
+  controller.playSequence(['clear', 'win']);
+  assert.ok(clear.calls.includes('play'));
+  assert.deepEqual(win.calls, []);
+  const job = [...scheduler.jobs.values()][0];
+  assert.ok(job.delay >= clear.duration * 1000);
+  job.callback();
+  assert.ok(win.calls.includes('play'));
+});
+
+test('mute, stop, backgrounding and disposal cancel queued outcome sounds', () => {
+  for (const action of ['mute', 'stop', 'background', 'dispose']) {
+    const clear = fakePlayer();
+    const win = fakePlayer();
+    const scheduler = fakeScheduler();
+    const controller = createSoundController({ clear, win }, Date.now, scheduler);
+    controller.setEnabled(true);
+    controller.playSequence(['clear', 'win']);
+    if (action === 'mute') controller.setEnabled(false);
+    if (action === 'stop') controller.stop();
+    if (action === 'background') controller.setActive(false);
+    if (action === 'dispose') controller.dispose();
+    assert.equal(scheduler.jobs.size, 0, action);
+    assert.ok(!win.calls.includes('play'), action);
+  }
 });
 
 test('every shipped effect is a short, non-silent, unclipped PCM WAV', () => {
@@ -120,4 +187,14 @@ test('every shipped effect is a short, non-silent, unclipped PCM WAV', () => {
     totalBytes += data.length;
   }
   assert.ok(totalBytes < 150000, 'Sound pack must remain small enough to bundle offline');
+});
+
+test('the bundled menu theme is a complete, non-silent loop kept below 250 KB', () => {
+  const data = readFileSync(new URL('../assets/sounds/menu.wav', import.meta.url));
+  assert.equal(data.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(data.readUInt32LE(40), data.length - 44);
+  assert.ok(data.length > 44044 && data.length < 250000);
+  assert.equal(data.readInt16LE(44), 0);
+  assert.equal(data.readInt16LE(data.length - 2), 0);
+  assert.ok(data.subarray(44).some((sample) => sample !== 0));
 });

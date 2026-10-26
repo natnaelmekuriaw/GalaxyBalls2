@@ -39,8 +39,9 @@ import { runAllEngineTests } from "../engine/galaxyEngine.test";
 import { GameText as Text } from "../components/game-text";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { LANGUAGES } from "../i18n/translations";
-import { getResolutionSound } from "../audio/soundEvents";
+import { getResolutionSounds } from "../audio/soundEvents";
 import { useGameSounds } from "../hooks/use-game-sounds";
+import { useMenuMusic } from "../hooks/use-menu-music";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -248,7 +249,9 @@ export default function OrbitBlocksApp() {
 
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [soundsEnabled, setSoundsEnabled] = useState(true);
-  const { play: playSound, stop: stopSounds } = useGameSounds(soundsEnabled);
+  const [menuMusicEnabled, setMenuMusicEnabled] = useState(true);
+  const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled);
+  const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME");
   const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
   const highContrast = false;
   const [rotationStrategy, setRotationStrategy] = useState<
@@ -281,8 +284,19 @@ export default function OrbitBlocksApp() {
 
   const showScreen = (target: typeof screen) => {
     stopSounds();
+    menuMusic.start();
     playSound("ui");
     setScreen(target);
+  };
+
+  const toggleMenuMusic = () => {
+    if (menuMusic.playing) {
+      setMenuMusicEnabled(false);
+      menuMusic.stop();
+    } else {
+      setMenuMusicEnabled(true);
+      menuMusic.start();
+    }
   };
 
   const togglePause = () => {
@@ -347,7 +361,7 @@ export default function OrbitBlocksApp() {
   );
 
   const handleResolution = useCallback((state: EngineState, summary: LockResolutionSummary) => {
-    playSound(getResolutionSound(summary));
+    playSoundSequence(getResolutionSounds(summary));
     if (summary.stoneLanded) triggerHaptic(65);
     if (summary.specialTriggered) {
       setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
@@ -362,7 +376,7 @@ export default function OrbitBlocksApp() {
       triggerHaptic(20);
     }
     if (summary.gameOver) recordHighScore(state.config.mode, state.score, state.level);
-  }, [playSound, triggerHaptic, t, recordHighScore]);
+  }, [playSoundSequence, triggerHaptic, t, recordHighScore]);
 
   const syncSmoothPieceAnimation = useCallback(
     (s: EngineState, immediateX = false) => {
@@ -449,6 +463,7 @@ export default function OrbitBlocksApp() {
   }, [bannerText]);
 
   const startNewGame = (mode: GameMode) => {
+    menuMusic.stop();
     stopSounds();
     playSound("start");
     const fresh = createNewGameState(mode, {
@@ -624,7 +639,20 @@ export default function OrbitBlocksApp() {
     const heroMascot = MASCOTS[0];
     const languageLabel = LANGUAGES.find((option) => option.code === language)!.label;
     return (
-      <View style={styles.titleContainer}>
+      <ScrollView style={styles.titleScreen} contentContainerStyle={styles.titleContainer}>
+        <View style={styles.homeTopBar}>
+          <TouchableOpacity
+            style={styles.homeLanguageButton}
+            accessibilityRole="button"
+            accessibilityLabel={t(menuMusic.playing ? "pauseMenuMusic" : "playMenuMusic")}
+            accessibilityState={{ disabled: !soundsEnabled || !menuMusic.ready }}
+            aria-pressed={menuMusic.playing}
+            disabled={!soundsEnabled || !menuMusic.ready}
+            onPress={toggleMenuMusic}
+          >
+            <Text style={styles.homeLanguageIcon}>♫</Text>
+            <Text style={styles.homeLanguageLabel}>{t(menuMusic.playing ? "on" : "off")}</Text>
+          </TouchableOpacity>
         <TouchableOpacity
           style={styles.homeLanguageButton}
           accessibilityRole="button"
@@ -635,6 +663,7 @@ export default function OrbitBlocksApp() {
           <Text style={styles.homeLanguageLabel}>{languageLabel}</Text>
           <Text style={styles.homeLanguageLabel}>›</Text>
         </TouchableOpacity>
+        </View>
         <View style={styles.logoStack}>
           <Text style={styles.logoGalaxy}>Galaxy</Text>
           <View style={styles.logoSwoosh} />
@@ -658,12 +687,14 @@ export default function OrbitBlocksApp() {
             onPress={() => startNewGame("CLASSIC")}
           >
             <Text style={styles.goldMenuBtnText}>▶ {t("playClassic")}</Text>
+            <Text style={[styles.modeHint, { color: "#302009" }]}>{t("classicHint")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.darkMenuBtn}
             onPress={() => startNewGame("COMFORT")}
           >
             <Text style={styles.darkMenuBtnText}>⚡ {t("playComfort")}</Text>
+            <Text style={styles.modeHint}>{t("quickPlayHint")}</Text>
           </TouchableOpacity>
           <View style={styles.menuRow}>
             <TouchableOpacity
@@ -686,7 +717,7 @@ export default function OrbitBlocksApp() {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -772,7 +803,10 @@ export default function OrbitBlocksApp() {
                 aria-checked={language === option.code}
                 accessibilityLabel={option.label}
                 style={[styles.languageOption, language === option.code && styles.languageSelected]}
-                onPress={() => setLanguage(option.code)}
+                onPress={() => {
+                  playSound("ui");
+                  setLanguage(option.code);
+                }}
               >
                 <Text style={styles.languageLabel}>
                   {language === option.code ? "●" : "○"} {option.label}
@@ -789,11 +823,29 @@ export default function OrbitBlocksApp() {
           aria-checked={soundsEnabled}
           onPress={() => {
             stopSounds();
+            if (soundsEnabled) menuMusic.stop();
             setSoundsEnabled(!soundsEnabled);
           }}
         >
           <Text style={styles.toggleLabel}>{t("soundEffects")}</Text>
           <Text style={styles.toggleValue}>{t(soundsEnabled ? "on" : "off")}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toggleRow, !soundsEnabled && { opacity: 0.45 }]}
+          accessibilityRole="switch"
+          accessibilityLabel={t("menuMusic")}
+          accessibilityState={{ checked: menuMusicEnabled, disabled: !soundsEnabled }}
+          aria-checked={menuMusicEnabled}
+          disabled={!soundsEnabled}
+          onPress={() => {
+            playSound("ui");
+            if (menuMusicEnabled) menuMusic.stop();
+            else menuMusic.start();
+            setMenuMusicEnabled(!menuMusicEnabled);
+          }}
+        >
+          <Text style={styles.toggleLabel}>{t("menuMusic")}</Text>
+          <Text style={styles.toggleValue}>{t(menuMusicEnabled ? "on" : "off")}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.darkMenuBtn, !soundsEnabled && { opacity: 0.45 }]}
@@ -807,7 +859,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
-          onPress={() => setHapticsEnabled(!hapticsEnabled)}
+          onPress={() => {
+            playSound("ui");
+            setHapticsEnabled(!hapticsEnabled);
+          }}
         >
           <Text style={styles.toggleLabel}>{t("haptics")}</Text>
           <Text style={styles.toggleValue}>
@@ -816,7 +871,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
-          onPress={() => setColorblindGlyphs(!colorblindGlyphs)}
+          onPress={() => {
+            playSound("ui");
+            setColorblindGlyphs(!colorblindGlyphs);
+          }}
         >
           <Text style={styles.toggleLabel}>{t("emblems")}</Text>
           <Text style={styles.toggleValue}>
@@ -825,11 +883,12 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
-          onPress={() =>
+          onPress={() => {
+            playSound("ui");
             setRotationStrategy(
               rotationStrategy === "GEOMETRY_90" ? "COLOR_CYCLE" : "GEOMETRY_90"
-            )
-          }
+            );
+          }}
         >
           <Text style={styles.toggleLabel}>{t("rotationMode")}</Text>
           <Text style={styles.toggleValue}>{t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}</Text>
@@ -1111,14 +1170,33 @@ export default function OrbitBlocksApp() {
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  titleScreen: {
     flex: 1,
+    backgroundColor: "#020412",
+  },
+  titleContainer: {
+    flexGrow: 1,
     backgroundColor: "#020412",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 48,
     paddingTop: Platform.OS === "web" ? 80 : 48,
     paddingHorizontal: 22,
+    gap: 12,
+  },
+  homeTopBar: {
+    width: "100%",
+    maxWidth: 340,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  modeHint: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    marginTop: 4,
   },
   homeLanguageButton: {
     alignSelf: "flex-end",
