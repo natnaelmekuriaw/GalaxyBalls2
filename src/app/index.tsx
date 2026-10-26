@@ -1,5 +1,5 @@
 // src/app/(tabs)/index.tsx
-import { useNavigation } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -695,6 +695,18 @@ export default function OrbitBlocksApp() {
           >
             <Text style={styles.darkMenuBtnText}>⚡ {t("playComfort")}</Text>
             <Text style={styles.modeHint}>{t("quickPlayHint")}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.darkMenuBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t("otherGames")}
+            onPress={() => {
+              playSound("ui");
+              menuMusic.start();
+              router.navigate("/explore");
+            }}
+          >
+            <Text style={styles.darkMenuBtnText}>{t("otherGames")}</Text>
           </TouchableOpacity>
           <View style={styles.menuRow}>
             <TouchableOpacity
