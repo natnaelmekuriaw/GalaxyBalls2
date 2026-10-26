@@ -3,7 +3,9 @@ A mobile and web game built with React Native and Expo.
 
 ## Languages
 
-Open **Settings → Language** and select **English**, **አማርኛ**, or **Afaan Oromoo**.
+Tap the language button on the home screen to open language settings, or open
+**Settings → Language**, and select **English**, **አማርኛ**, or **Afaan Oromoo**.
+The home button always shows the currently selected language.
 The game menus, rules, controls, score displays, and game messages update immediately.
 The selection lasts for the current app session; saving preferences is planned as a separate change.
 

@@ -600,9 +600,19 @@ export default function OrbitBlocksApp() {
 
   if (screen === "TITLE") {
     const heroMascot = MASCOTS[0];
+    const languageLabel = LANGUAGES.find((option) => option.code === language)!.label;
     return (
       <View style={styles.titleContainer}>
-        <Text style={styles.starScatterTop}>· ✦ * · ✧ · *</Text>
+        <TouchableOpacity
+          style={styles.homeLanguageButton}
+          accessibilityRole="button"
+          accessibilityLabel={t("languageShortcut", { language: languageLabel })}
+          onPress={() => setScreen("SETTINGS")}
+        >
+          <Text style={styles.homeLanguageIcon}>🌐</Text>
+          <Text style={styles.homeLanguageLabel}>{languageLabel}</Text>
+          <Text style={styles.homeLanguageLabel}>›</Text>
+        </TouchableOpacity>
         <View style={styles.logoStack}>
           <Text style={styles.logoGalaxy}>Galaxy</Text>
           <View style={styles.logoSwoosh} />
@@ -1079,12 +1089,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 48,
+    paddingTop: Platform.OS === "web" ? 80 : 48,
     paddingHorizontal: 22,
   },
-  starScatterTop: {
-    color: "#CBD5E1",
+  homeLanguageButton: {
+    alignSelf: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    minHeight: 48,
+    maxWidth: "100%",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: "#0F172A",
+    borderWidth: 1,
+    borderColor: "#475569",
+    borderRadius: 24,
+  },
+  homeLanguageIcon: {
+    fontSize: 18,
+  },
+  homeLanguageLabel: {
+    color: "#F8FAFC",
     fontSize: 14,
-    letterSpacing: 4,
+    fontWeight: "600",
+    flexShrink: 1,
   },
   logoStack: {
     alignItems: "center",
