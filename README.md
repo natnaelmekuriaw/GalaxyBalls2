@@ -56,7 +56,10 @@ until you choose Resume Game.
 The current board, falling piece position and colors, next-piece preview, score,
 level, mode, rotation rules, and random sequence are saved after every game action
 and gravity step. Pausing, returning to the main menu, leaving the game tab, or
-backgrounding also keeps the checkpoint. Starting a new game replaces it. Game
+backgrounding also keeps the checkpoint. Starting a new game asks for confirmation
+if a saved game exists. **Cancel** (or the system back/close action) keeps the
+saved game; **Replace and start** replaces it with the selected mode. High scores
+and settings are preserved. With no saved game, play starts immediately. Game
 over saves the high score and clears the unfinished game together.
 
 Data stays on the device using AsyncStorage. On web, it stays in the current
@@ -100,3 +103,7 @@ score, and mode. Continue playing and verify the next piece follows the saved
 preview. Finish the run and reopen again: its score should remain in Top 5 and
 Resume Game should be gone. Existing saved language, audio settings, and scores
 remain compatible.
+With an unfinished game saved, tap Classic or Quick Play and cancel the
+confirmation. Reopen and resume: the same game should remain. Repeat and choose
+Replace and start: a fresh game should use the selected mode. Also check the
+first-game and Play Again flows start immediately when no saved game exists.
