@@ -36,7 +36,6 @@ import {
   rotateActivePiece,
   stepGravityTick,
 } from "../engine/galaxyEngine";
-import { runAllEngineTests } from "../engine/galaxyEngine.test";
 import { GameText as Text } from "../components/game-text";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { LANGUAGES } from "../i18n/translations";
@@ -46,6 +45,8 @@ import { useMenuMusic } from "../hooks/use-menu-music";
 import { useGameData } from "../data/GameDataProvider";
 import { NewGameConfirmation } from "../components/new-game-confirmation";
 import { GameControls } from "../components/game-controls";
+import { GameFeedback } from "../components/game-feedback";
+import { getResolutionFeedback, type ResolutionFeedback } from "../gameplay/feedback";
 import { ARENA_PADDING, getGameArenaLayout, MASCOT_HEIGHT, MASCOT_WIDTH } from "../utils/game-layout";
 
 const NORMAL_BLOCKS = [
@@ -233,7 +234,12 @@ export default function OrbitBlocksApp() {
     arenaSize.width, arenaSize.height, { columns: GRID_COLS, rows: GRID_ROWS, previewColumns: PREVIEW_SIZE },
   );
   const { language, setLanguage, t } = useLanguage();
-  const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, currentGame, saveCurrentGame, finishGame, saveFailed } = useGameData();
+  const {
+    soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled,
+    hapticsEnabled, setHapticsEnabled, colorblindGlyphs, setColorblindGlyphs,
+    rotationMode: rotationStrategy, setRotationMode: setRotationStrategy,
+    highScores, currentGame, saveCurrentGame, finishGame, saveFailed,
+  } = useGameData();
 
   useEffect(() => {
     navigation.setOptions({
@@ -256,19 +262,13 @@ export default function OrbitBlocksApp() {
   const pieceTranslateY = useMemo(() => Animated.multiply(animY, cellSize), [animY, cellSize]);
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled);
   const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME");
-  const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
   const highContrast = false;
-  const [rotationStrategy, setRotationStrategy] = useState<
-    "GEOMETRY_90" | "COLOR_CYCLE"
-  >("GEOMETRY_90");
   const experimental4Block = false;
 
-  const [testReport, setTestReport] = useState<string[] | null>(null);
   const [pendingNewGameMode, setPendingNewGameMode] = useState<GameMode | null>(null);
-  const [bannerText, setBannerText] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ResolutionFeedback | null>(null);
   const stateRef = useRef<EngineState>(gameState);
 
   const forceRender = useCallback(() => {
@@ -340,21 +340,18 @@ export default function OrbitBlocksApp() {
 
   const handleResolution = useCallback((state: EngineState, summary: LockResolutionSummary) => {
     playSoundSequence(getResolutionSounds(summary));
+    const nextFeedback = getResolutionFeedback(summary, state.level);
+    if (nextFeedback) setFeedback(nextFeedback);
     if (summary.stoneLanded) triggerHaptic(65);
     if (summary.specialTriggered) {
-      setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
       triggerHaptic(50);
     } else if (summary.chainDepth >= 2) {
-      setBannerText(t("cascade", { count: summary.chainDepth }));
       triggerHaptic(40);
-    } else if (summary.levelUp) {
-      setBannerText(t("levelUp", { level: state.level }));
     } else if (summary.clearedCount > 0) {
-      setBannerText(`+${summary.scoreDelta}`);
       triggerHaptic(20);
     }
     if (summary.gameOver) finishGame(state);
-  }, [playSoundSequence, triggerHaptic, t, finishGame]);
+  }, [playSoundSequence, triggerHaptic, finishGame]);
 
   const syncSmoothPieceAnimation = useCallback(
     (s: EngineState, immediateX = false) => {
@@ -442,10 +439,10 @@ export default function OrbitBlocksApp() {
   ]);
 
   useEffect(() => {
-    if (!bannerText) return;
-    const t = setTimeout(() => setBannerText(null), 1000);
-    return () => clearTimeout(t);
-  }, [bannerText]);
+    if (!feedback || screen !== "GAME" || gameState.status !== "PLAYING") return;
+    const timer = setTimeout(() => setFeedback(null), 2200);
+    return () => clearTimeout(timer);
+  }, [feedback, screen, gameState.status]);
 
   const startNewGame = (mode: GameMode) => {
     setPendingNewGameMode(null);
@@ -458,7 +455,7 @@ export default function OrbitBlocksApp() {
     });
     stateRef.current = fresh;
     forceRender();
-    setBannerText(null);
+    setFeedback(null);
     if (fresh.activePiece) {
       animX.setValue(fresh.activePiece.x);
       animY.setValue(fresh.activePiece.y);
@@ -485,8 +482,7 @@ export default function OrbitBlocksApp() {
     const restored = { ...snapshotEngineState(currentGame), config: { ...currentGame.config } };
     restored.status = "PLAYING";
     stateRef.current = restored;
-    setRotationStrategy(restored.config.rotationMode);
-    setBannerText(null);
+    setFeedback(null);
     menuMusic.stop();
     stopSounds();
     playSound("ui");
@@ -918,6 +914,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={t("haptics")}
+          accessibilityState={{ checked: hapticsEnabled }}
+          aria-checked={hapticsEnabled}
           onPress={() => {
             playSound("ui");
             setHapticsEnabled(!hapticsEnabled);
@@ -930,6 +930,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={t("emblems")}
+          accessibilityState={{ checked: colorblindGlyphs }}
+          aria-checked={colorblindGlyphs}
           onPress={() => {
             playSound("ui");
             setColorblindGlyphs(!colorblindGlyphs);
@@ -942,6 +946,8 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("rotationMode")}: ${t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}`}
           onPress={() => {
             playSound("ui");
             setRotationStrategy(
@@ -952,24 +958,7 @@ export default function OrbitBlocksApp() {
           <Text style={styles.toggleLabel}>{t("rotationMode")}</Text>
           <Text style={styles.toggleValue}>{t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.darkMenuBtn}
-          onPress={() => {
-            const res = runAllEngineTests();
-            setTestReport(res.log);
-          }}
-        >
-          <Text style={styles.darkMenuBtnText}>🧪 {t("runTests")}</Text>
-        </TouchableOpacity>
-        {testReport && (
-          <View style={styles.infoCard}>
-            {testReport.map((line, idx) => (
-              <Text key={idx} style={styles.testLine}>
-                {line}
-              </Text>
-            ))}
-          </View>
-        )}
+        <Text style={styles.infoBody}>{t("rotationHint")}</Text>
         <TouchableOpacity
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
@@ -1008,11 +997,7 @@ export default function OrbitBlocksApp() {
     </View>
   );
   const skyBanner = (
-    <View style={styles.spaceSkyBanner}>
-      <Text style={styles.spaceSkyStars}>
-        ✦ * · ★ {bannerText || t("level", { level: gameState.level })} · ✦
-      </Text>
-    </View>
+    <GameFeedback score={gameState.score} level={gameState.level} feedback={feedback} />
   );
   const controls = (
     <GameControls
@@ -1129,6 +1114,13 @@ export default function OrbitBlocksApp() {
               </Animated.View>
             )}
           </View>
+          {feedback && (
+            <View
+              testID="resolution-effect"
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { borderRadius: 8, borderWidth: 3, borderColor: feedback.color }]}
+            />
+          )}
         </View>
 
         <View style={[styles.rightColumn, { width: rightColumnWidth, height: boardHeight }]}>
@@ -1440,16 +1432,6 @@ const styles = StyleSheet.create({
     color: "#FFFBEB",
     fontSize: 14,
     fontWeight: "900",
-  },
-  spaceSkyBanner: {
-    alignItems: "center",
-    paddingVertical: 2,
-  },
-  spaceSkyStars: {
-    color: "#E2E8F0",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 2,
   },
   arena: {
     flex: 1,
@@ -1885,11 +1867,6 @@ const styles = StyleSheet.create({
     color: "#F59B1A",
     fontSize: 14,
     fontWeight: "900",
-  },
-  testLine: {
-    color: "#4ADE80",
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },
   languageOptions: {
     gap: 8,

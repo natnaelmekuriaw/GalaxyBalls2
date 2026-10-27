@@ -8,6 +8,9 @@ export interface GameData {
   language: Language;
   soundsEnabled: boolean;
   menuMusicEnabled: boolean;
+  hapticsEnabled: boolean;
+  colorblindGlyphs: boolean;
+  rotationMode: GameConfig['rotationMode'];
   highScores: Record<GameMode, HighScoreEntry[]>;
   currentGame: EngineState | null;
 }
@@ -23,6 +26,9 @@ export function createDefaultGameData(): GameData {
     language: 'en',
     soundsEnabled: true,
     menuMusicEnabled: true,
+    hapticsEnabled: true,
+    colorblindGlyphs: true,
+    rotationMode: 'GEOMETRY_90',
     currentGame: null,
     highScores: {
       CLASSIC: [
@@ -151,6 +157,9 @@ export function parseGameData(raw: string | null): GameData {
   if (saved.language === 'en' || saved.language === 'am' || saved.language === 'om') data.language = saved.language;
   if (typeof saved.soundsEnabled === 'boolean') data.soundsEnabled = saved.soundsEnabled;
   if (typeof saved.menuMusicEnabled === 'boolean') data.menuMusicEnabled = saved.menuMusicEnabled;
+  if (typeof saved.hapticsEnabled === 'boolean') data.hapticsEnabled = saved.hapticsEnabled;
+  if (typeof saved.colorblindGlyphs === 'boolean') data.colorblindGlyphs = saved.colorblindGlyphs;
+  if (saved.rotationMode === 'GEOMETRY_90' || saved.rotationMode === 'COLOR_CYCLE') data.rotationMode = saved.rotationMode;
   data.currentGame = parseCurrentGame(saved.currentGame);
   if (isRecord(saved.highScores)) {
     for (const mode of ['CLASSIC', 'COMFORT'] as const) {
@@ -210,7 +219,7 @@ export function createGameDataStore(storage: GameDataStorage) {
     enqueueSave();
     notify();
   };
-  const setPreference = <Key extends 'language' | 'soundsEnabled' | 'menuMusicEnabled'>(key: Key, value: GameData[Key]) => {
+  const setPreference = <Key extends 'language' | 'soundsEnabled' | 'menuMusicEnabled' | 'hapticsEnabled' | 'colorblindGlyphs' | 'rotationMode'>(key: Key, value: GameData[Key]) => {
     if (snapshot.data[key] !== value) update({ ...snapshot.data, [key]: value });
   };
 
@@ -239,6 +248,9 @@ export function createGameDataStore(storage: GameDataStorage) {
     setLanguage: (value: Language) => setPreference('language', value),
     setSoundsEnabled: (value: boolean) => setPreference('soundsEnabled', value),
     setMenuMusicEnabled: (value: boolean) => setPreference('menuMusicEnabled', value),
+    setHapticsEnabled: (value: boolean) => setPreference('hapticsEnabled', value),
+    setColorblindGlyphs: (value: boolean) => setPreference('colorblindGlyphs', value),
+    setRotationMode: (value: GameConfig['rotationMode']) => setPreference('rotationMode', value),
     recordHighScore(mode: GameMode, score: number, level: number, date = new Date().toISOString().slice(0, 10)) {
       update(withHighScore(snapshot.data, mode, score, level, date));
     },

@@ -5,7 +5,7 @@ import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 import { createGameDataStore, type GameData, type GameDataStore } from './gameDataStore';
 
 type GameDataContextValue = GameData & Pick<GameDataStore,
-  'setLanguage' | 'setSoundsEnabled' | 'setMenuMusicEnabled' | 'recordHighScore' | 'saveCurrentGame' | 'finishGame'> & { saveFailed: boolean };
+  'setLanguage' | 'setSoundsEnabled' | 'setMenuMusicEnabled' | 'setHapticsEnabled' | 'setColorblindGlyphs' | 'setRotationMode' | 'recordHighScore' | 'saveCurrentGame' | 'finishGame'> & { saveFailed: boolean };
 
 const GameDataContext = createContext<GameDataContextValue | null>(null);
 
@@ -27,6 +27,9 @@ export function GameDataProvider({ children }: PropsWithChildren) {
     setLanguage: store.setLanguage,
     setSoundsEnabled: store.setSoundsEnabled,
     setMenuMusicEnabled: store.setMenuMusicEnabled,
+    setHapticsEnabled: store.setHapticsEnabled,
+    setColorblindGlyphs: store.setColorblindGlyphs,
+    setRotationMode: store.setRotationMode,
     recordHighScore: store.recordHighScore,
     saveCurrentGame: store.saveCurrentGame,
     finishGame: store.finishGame,
