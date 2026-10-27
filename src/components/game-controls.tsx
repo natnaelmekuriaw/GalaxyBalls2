@@ -2,6 +2,8 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 
 import { GameText as Text } from '@/components/game-text';
 import { useLanguage } from '@/i18n/LanguageProvider';
+import { HOLD_DELAY_MS } from '@/controls/holdController';
+import { useHeldMovement } from '@/hooks/use-held-movement';
 
 type Props = {
   enabled: boolean;
@@ -19,10 +21,13 @@ type ButtonProps = {
   hint?: string;
   enabled: boolean;
   onPress: () => void;
+  onPressIn: () => void;
+  onPressOut?: () => void;
+  onLongPress?: () => void;
   style?: StyleProp<ViewStyle>;
 };
 
-function ControlButton({ symbol, label, hint, enabled, onPress, style }: ButtonProps) {
+function ControlButton({ symbol, label, hint, enabled, onPress, onPressIn, onPressOut, onLongPress, style }: ButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -31,6 +36,12 @@ function ControlButton({ symbol, label, hint, enabled, onPress, style }: ButtonP
       accessibilityState={{ disabled: !enabled }}
       disabled={!enabled}
       onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onLongPress={onLongPress}
+      delayLongPress={HOLD_DELAY_MS}
+      onBlur={onPressOut ?? onPressIn}
+      pressRetentionOffset={0}
       style={({ pressed }) => [styles.button, style, pressed && styles.pressed, !enabled && styles.disabled]}>
       <Text style={styles.symbol}>{symbol}</Text>
       <Text style={styles.label} numberOfLines={2}>{label}</Text>
@@ -40,18 +51,19 @@ function ControlButton({ symbol, label, hint, enabled, onPress, style }: ButtonP
 
 export function GameControls({ enabled, allowHardDrop, onLeft, onDown, onRight, onRotate, onDrop }: Props) {
   const { t } = useLanguage();
+  const held = useHeldMovement(enabled, { left: onLeft, down: onDown, right: onRight });
   return (
     <View testID="game-controls" style={styles.controls}>
       <View testID="action-controls" style={styles.actions}>
-        <ControlButton symbol="↻" label={t('rotate')} enabled={enabled} onPress={onRotate} style={styles.rotate} />
+        <ControlButton symbol="↻" label={t('rotate')} enabled={enabled} onPress={onRotate} onPressIn={() => held.stop()} style={styles.rotate} />
         {allowHardDrop && (
-          <ControlButton symbol="⇓" label={t('drop')} hint={t('instantDropHint')} enabled={enabled} onPress={onDrop} style={styles.drop} />
+          <ControlButton symbol="⇓" label={t('drop')} hint={t('instantDropHint')} enabled={enabled} onPress={onDrop} onPressIn={() => held.stop()} style={styles.drop} />
         )}
       </View>
       <View testID="movement-controls" style={styles.movement}>
-        <ControlButton symbol="◀" label={t('left')} enabled={enabled} onPress={onLeft} />
-        <ControlButton symbol="▼" label={t('down')} hint={t('moveDownHint')} enabled={enabled} onPress={onDown} />
-        <ControlButton symbol="▶" label={t('right')} enabled={enabled} onPress={onRight} />
+        <ControlButton symbol="◀" label={t('left')} hint={t('moveLeftHint')} enabled={enabled} onPress={onLeft} onPressIn={() => held.stop()} onLongPress={() => held.start('left')} onPressOut={() => held.stop('left')} />
+        <ControlButton symbol="▼" label={t('down')} hint={t('moveDownHint')} enabled={enabled} onPress={onDown} onPressIn={() => held.stop()} onLongPress={() => held.start('down')} onPressOut={() => held.stop('down')} />
+        <ControlButton symbol="▶" label={t('right')} hint={t('moveRightHint')} enabled={enabled} onPress={onRight} onPressIn={() => held.stop()} onLongPress={() => held.start('right')} onPressOut={() => held.stop('right')} />
       </View>
     </View>
   );
