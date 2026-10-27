@@ -20,7 +20,6 @@ import {
   GRID_COLS,
   GRID_ROWS,
   GameMode,
-  HighScoreEntry,
   MASCOTS,
   MascotInfo,
   MascotMood,
@@ -42,6 +41,7 @@ import { LANGUAGES } from "../i18n/translations";
 import { getResolutionSounds } from "../audio/soundEvents";
 import { useGameSounds } from "../hooks/use-game-sounds";
 import { useMenuMusic } from "../hooks/use-menu-music";
+import { useGameData } from "../data/GameDataProvider";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -228,6 +228,7 @@ function snapshotEngineState(state: EngineState): EngineState {
 export default function OrbitBlocksApp() {
   const navigation = useNavigation();
   const { language, setLanguage, t } = useLanguage();
+  const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, recordHighScore, saveFailed } = useGameData();
 
   useEffect(() => {
     navigation.setOptions({
@@ -248,8 +249,6 @@ export default function OrbitBlocksApp() {
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
-  const [soundsEnabled, setSoundsEnabled] = useState(true);
-  const [menuMusicEnabled, setMenuMusicEnabled] = useState(true);
   const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled);
   const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME");
   const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
@@ -258,21 +257,6 @@ export default function OrbitBlocksApp() {
     "GEOMETRY_90" | "COLOR_CYCLE"
   >("GEOMETRY_90");
   const experimental4Block = false;
-
-  const [highScores, setHighScores] = useState<
-    Record<GameMode, HighScoreEntry[]>
-  >({
-    CLASSIC: [
-      { alias: "NOK", score: 90, level: 1, date: "2026-10-14" },
-      { alias: "ORB", score: 60, level: 1, date: "2026-10-14" },
-      { alias: "GAL", score: 30, level: 1, date: "2026-10-14" },
-    ],
-    COMFORT: [
-      { alias: "MOD", score: 180, level: 2, date: "2026-10-14" },
-      { alias: "ZEN", score: 90, level: 1, date: "2026-10-14" },
-    ],
-    PRACTICE: [],
-  });
 
   const [testReport, setTestReport] = useState<string[] | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
@@ -337,27 +321,6 @@ export default function OrbitBlocksApp() {
       }
     },
     [hapticsEnabled]
-  );
-
-  const recordHighScore = useCallback(
-    (mode: GameMode, score: number, level: number) => {
-      if (mode === "PRACTICE" || score <= 0) return;
-      setHighScores((prev) => {
-        const updated = [
-          ...prev[mode],
-          {
-            alias: "YOU",
-            score,
-            level,
-            date: new Date().toISOString().slice(0, 10),
-          },
-        ]
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 5);
-        return { ...prev, [mode]: updated };
-      });
-    },
-    []
   );
 
   const handleResolution = useCallback((state: EngineState, summary: LockResolutionSummary) => {
@@ -803,6 +766,7 @@ export default function OrbitBlocksApp() {
         contentContainerStyle={styles.modalContent}
       >
         <Text style={styles.sectionHeader}>⚙️ {t("settings")}</Text>
+        {saveFailed && <Text accessibilityRole="alert" style={styles.infoBody}>{t("saveFailed")}</Text>}
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>{t("language")}</Text>
           <Text style={styles.infoBody}>{t("languageHint")}</Text>
@@ -937,7 +901,7 @@ export default function OrbitBlocksApp() {
   const modeHighList = highScores[gameState.config.mode] || [];
   const topHighScore = Math.max(
     gameState.score,
-    modeHighList.length > 0 ? modeHighList[0].score : 90
+    modeHighList.length > 0 ? modeHighList[0].score : 0
   );
   const ghostY =
     gameState.config.showGhostPiece && gameState.activePiece
