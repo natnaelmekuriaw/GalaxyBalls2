@@ -45,6 +45,8 @@ import { useMenuMusic } from "../hooks/use-menu-music";
 import { useGameData } from "../data/GameDataProvider";
 import { NewGameConfirmation } from "../components/new-game-confirmation";
 import { GameControls } from "../components/game-controls";
+import { GameFeedback } from "../components/game-feedback";
+import { getResolutionFeedback, type ResolutionFeedback } from "../gameplay/feedback";
 import { ARENA_PADDING, getGameArenaLayout, MASCOT_HEIGHT, MASCOT_WIDTH } from "../utils/game-layout";
 
 const NORMAL_BLOCKS = [
@@ -266,7 +268,7 @@ export default function OrbitBlocksApp() {
   const experimental4Block = false;
 
   const [pendingNewGameMode, setPendingNewGameMode] = useState<GameMode | null>(null);
-  const [bannerText, setBannerText] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<ResolutionFeedback | null>(null);
   const stateRef = useRef<EngineState>(gameState);
 
   const forceRender = useCallback(() => {
@@ -338,21 +340,18 @@ export default function OrbitBlocksApp() {
 
   const handleResolution = useCallback((state: EngineState, summary: LockResolutionSummary) => {
     playSoundSequence(getResolutionSounds(summary));
+    const nextFeedback = getResolutionFeedback(summary, state.level);
+    if (nextFeedback) setFeedback(nextFeedback);
     if (summary.stoneLanded) triggerHaptic(65);
     if (summary.specialTriggered) {
-      setBannerText(t(summary.specialTriggered === "BOMB" ? "bombBlast" : summary.specialTriggered === "FLASH" ? "flashBlast" : "starBlast"));
       triggerHaptic(50);
     } else if (summary.chainDepth >= 2) {
-      setBannerText(t("cascade", { count: summary.chainDepth }));
       triggerHaptic(40);
-    } else if (summary.levelUp) {
-      setBannerText(t("levelUp", { level: state.level }));
     } else if (summary.clearedCount > 0) {
-      setBannerText(`+${summary.scoreDelta}`);
       triggerHaptic(20);
     }
     if (summary.gameOver) finishGame(state);
-  }, [playSoundSequence, triggerHaptic, t, finishGame]);
+  }, [playSoundSequence, triggerHaptic, finishGame]);
 
   const syncSmoothPieceAnimation = useCallback(
     (s: EngineState, immediateX = false) => {
@@ -440,10 +439,10 @@ export default function OrbitBlocksApp() {
   ]);
 
   useEffect(() => {
-    if (!bannerText) return;
-    const t = setTimeout(() => setBannerText(null), 1000);
-    return () => clearTimeout(t);
-  }, [bannerText]);
+    if (!feedback || screen !== "GAME" || gameState.status !== "PLAYING") return;
+    const timer = setTimeout(() => setFeedback(null), 2200);
+    return () => clearTimeout(timer);
+  }, [feedback, screen, gameState.status]);
 
   const startNewGame = (mode: GameMode) => {
     setPendingNewGameMode(null);
@@ -456,7 +455,7 @@ export default function OrbitBlocksApp() {
     });
     stateRef.current = fresh;
     forceRender();
-    setBannerText(null);
+    setFeedback(null);
     if (fresh.activePiece) {
       animX.setValue(fresh.activePiece.x);
       animY.setValue(fresh.activePiece.y);
@@ -483,7 +482,7 @@ export default function OrbitBlocksApp() {
     const restored = { ...snapshotEngineState(currentGame), config: { ...currentGame.config } };
     restored.status = "PLAYING";
     stateRef.current = restored;
-    setBannerText(null);
+    setFeedback(null);
     menuMusic.stop();
     stopSounds();
     playSound("ui");
@@ -998,11 +997,7 @@ export default function OrbitBlocksApp() {
     </View>
   );
   const skyBanner = (
-    <View style={styles.spaceSkyBanner}>
-      <Text style={styles.spaceSkyStars}>
-        ✦ * · ★ {bannerText || t("level", { level: gameState.level })} · ✦
-      </Text>
-    </View>
+    <GameFeedback score={gameState.score} level={gameState.level} feedback={feedback} />
   );
   const controls = (
     <GameControls
@@ -1119,6 +1114,13 @@ export default function OrbitBlocksApp() {
               </Animated.View>
             )}
           </View>
+          {feedback && (
+            <View
+              testID="resolution-effect"
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { borderRadius: 8, borderWidth: 3, borderColor: feedback.color }]}
+            />
+          )}
         </View>
 
         <View style={[styles.rightColumn, { width: rightColumnWidth, height: boardHeight }]}>
@@ -1430,16 +1432,6 @@ const styles = StyleSheet.create({
     color: "#FFFBEB",
     fontSize: 14,
     fontWeight: "900",
-  },
-  spaceSkyBanner: {
-    alignItems: "center",
-    paddingVertical: 2,
-  },
-  spaceSkyStars: {
-    color: "#E2E8F0",
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 2,
   },
   arena: {
     flex: 1,

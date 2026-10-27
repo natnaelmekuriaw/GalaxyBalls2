@@ -3,6 +3,7 @@
 export const GRID_COLS = 6;
 export const GRID_ROWS = 10;
 export const PREVIEW_SIZE = 3;
+export const SCORE_PER_LEVEL = 180;
 
 export type CellKind = "EMPTY" | "NORMAL" | "STONE" | "BOMB" | "FLASH" | "STAR";
 export type GameMode = "CLASSIC" | "COMFORT" | "PRACTICE";
@@ -721,7 +722,7 @@ export function lockActivePieceAndResolve(
   state.lastChainDepth = cascade.chainDepth;
   state.lastSpecialTriggered = summary.specialTriggered;
 
-  const targetLevel = Math.max(1, Math.floor(state.score / 180) + 1);
+  const targetLevel = Math.max(1, Math.floor(state.score / SCORE_PER_LEVEL) + 1);
   if (targetLevel > state.level) {
     state.level = targetLevel;
     summary.levelUp = true;
