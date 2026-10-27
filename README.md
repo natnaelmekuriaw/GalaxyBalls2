@@ -76,6 +76,12 @@ shows a message if changes cannot be saved.
 
 ## Game modes
 
+Movement controls are grouped together as **Left · Down · Right** on the right
+for easier reach with the right thumb. **Rotate** and Quick Play's instant **Drop**
+sit in a separate group on the left, with different colors. The controls stay
+near the right edge on wider screens and use touch targets at least 48 by 56
+points. Buttons are disabled while paused or game over.
+
 - **Classic:** slower falling, no landing guide, and no instant drop.
 - **Quick Play** (previously Comfort): faster falling, a landing guide, and an
   instant-drop button. Existing scores keep their original mode identifier.
@@ -107,3 +113,7 @@ With an unfinished game saved, tap Classic or Quick Play and cancel the
 confirmation. Reopen and resume: the same game should remain. Repeat and choose
 Replace and start: a fresh game should use the selected mode. Also check the
 first-game and Play Again flows start immediately when no saved game exists.
+For controls, check Classic and Quick Play at small phone widths in all three
+languages. Verify the movement buttons stay together on the right, Rotate and
+Drop stay on the left, and every control performs its labeled action. Quick Play
+should show instant Drop; Classic should not. Check pressed and paused states too.

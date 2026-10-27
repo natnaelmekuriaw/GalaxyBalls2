@@ -43,6 +43,7 @@ import { useGameSounds } from "../hooks/use-game-sounds";
 import { useMenuMusic } from "../hooks/use-menu-music";
 import { useGameData } from "../data/GameDataProvider";
 import { NewGameConfirmation } from "../components/new-game-confirmation";
+import { GameControls } from "../components/game-controls";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -1133,50 +1134,15 @@ export default function OrbitBlocksApp() {
         </View>
       </View>
 
-      <View style={styles.controlStrip}>
-        <TouchableOpacity
-          style={styles.ctrlBtn}
-          activeOpacity={0.65}
-          onPress={handleMoveLeft}
-        >
-          <Text style={styles.ctrlBtnText}>◀</Text>
-          <Text style={styles.ctrlSubLabel}>{t("left")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.ctrlBtn}
-          activeOpacity={0.65}
-          onPress={handleRotate}
-        >
-          <Text style={styles.ctrlBtnText}>↻</Text>
-          <Text style={styles.ctrlSubLabel}>{t("rotate")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.ctrlBtn}
-          activeOpacity={0.65}
-          onPress={handleSoftDrop}
-        >
-          <Text style={styles.ctrlBtnText}>▼</Text>
-          <Text style={styles.ctrlSubLabel}>{t("down")}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.ctrlBtn}
-          activeOpacity={0.65}
-          onPress={handleMoveRight}
-        >
-          <Text style={styles.ctrlBtnText}>▶</Text>
-          <Text style={styles.ctrlSubLabel}>{t("right")}</Text>
-        </TouchableOpacity>
-        {gameState.config.allowHardDrop && (
-          <TouchableOpacity
-            style={[styles.ctrlBtn, styles.hardDropBtn]}
-            activeOpacity={0.65}
-            onPress={handleHardDrop}
-          >
-            <Text style={styles.ctrlBtnText}>⏬</Text>
-            <Text style={styles.ctrlSubLabel}>{t("drop")}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      <GameControls
+        enabled={gameState.status === "PLAYING"}
+        allowHardDrop={gameState.config.allowHardDrop}
+        onLeft={handleMoveLeft}
+        onDown={handleSoftDrop}
+        onRight={handleMoveRight}
+        onRotate={handleRotate}
+        onDrop={handleHardDrop}
+      />
 
       <Modal
         visible={
@@ -1772,36 +1738,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     marginTop: 2,
-  },
-  controlStrip: {
-    flexDirection: "row",
-    justifyContent: "space-evenly",
-    paddingHorizontal: 10,
-    paddingTop: 4,
-  },
-  ctrlBtn: {
-    backgroundColor: "#1E293B",
-    borderWidth: 2,
-    borderColor: "#F5A623",
-    minWidth: 66,
-    height: 56,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hardDropBtn: {
-    borderColor: "#38BDF8",
-  },
-  ctrlBtnText: {
-    color: "#FFFBEB",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  ctrlSubLabel: {
-    color: "#FDE68A",
-    fontSize: 9,
-    fontWeight: "800",
-    textAlign: "center",
   },
   overlayBackdrop: {
     flex: 1,

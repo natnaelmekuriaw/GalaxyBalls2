@@ -135,6 +135,73 @@ function fakeScheduler() {
   };
 }
 
+function specialLandingSummary(kind) {
+  const state = createNewGameState('COMFORT', {}, 123);
+  state.score = 170;
+  state.grid[9][0] = { kind: 'NORMAL', colorId: 1 };
+  if (kind === 'STAR') state.grid[9][5] = { kind: 'NORMAL', colorId: 1 };
+  else state.grid[kind === 'FLASH' ? 8 : 9][kind === 'FLASH' ? 0 : 1] = { kind: 'STONE' };
+  state.activePiece = { x: 0, y: kind === 'FLASH' ? 7 : 8, cells: [{ dx: 0, dy: 0, kind }], isSingleSpecial: true };
+  return lockActivePieceAndResolve(state);
+}
+
+function mockBrowserTimers(t) {
+  let id = 0;
+  const jobs = new Map();
+  t.mock.method(globalThis, 'setTimeout', function (callback, delay) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    jobs.set(++id, { callback, delay });
+    return id;
+  });
+  t.mock.method(globalThis, 'clearTimeout', function (timer) {
+    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+    jobs.delete(timer);
+  });
+  return jobs;
+}
+
+test('special-piece clears that advance a level use browser timers with the correct receiver', (t) => {
+  const jobs = mockBrowserTimers(t);
+  for (const kind of ['STAR', 'BOMB', 'FLASH']) {
+    const summary = specialLandingSummary(kind);
+    assert.equal(summary.specialTriggered, kind);
+    assert.equal(summary.levelUp, true);
+    assert.equal(summary.clearedCount, 2);
+    const cue = kind.toLowerCase();
+    assert.deepEqual(getResolutionSounds(summary), [cue, 'win']);
+    const players = Object.fromEntries(SOUND_CUES.map((name) => [name, fakePlayer()]));
+    const controller = createSoundController(players);
+    controller.setEnabled(true);
+    assert.doesNotThrow(() => controller.playSequence(getResolutionSounds(summary)), kind);
+    assert.ok(players[cue].calls.includes('play'));
+    assert.equal(jobs.size, 1);
+    for (const [timer, { callback }] of jobs) { jobs.delete(timer); callback(); }
+    assert.ok(players.win.calls.includes('play'));
+    controller.dispose();
+  }
+});
+
+test('browser timer cancellation is safe for pause, mute, background, disposal and replacement', (t) => {
+  const jobs = mockBrowserTimers(t);
+  for (const action of ['stop', 'mute', 'background', 'dispose', 'replace']) {
+    const players = Object.fromEntries(SOUND_CUES.map((name) => [name, fakePlayer()]));
+    const controller = createSoundController(players);
+    controller.setEnabled(true);
+    controller.playSequence(['star', 'cascade', 'win']);
+    assert.equal(jobs.size, 2);
+    assert.doesNotThrow(() => {
+      if (action === 'stop') controller.stop();
+      if (action === 'mute') controller.setEnabled(false);
+      if (action === 'background') controller.setActive(false);
+      if (action === 'dispose') controller.dispose();
+      if (action === 'replace') controller.playSequence(['land']);
+    }, action);
+    assert.equal(jobs.size, 0);
+    assert.ok(!players.win.calls.includes('play'));
+    controller.dispose();
+  }
+});
+
 test('a clear and victory play in sequence without masking the clear', () => {
   const clear = fakePlayer();
   const win = fakePlayer();

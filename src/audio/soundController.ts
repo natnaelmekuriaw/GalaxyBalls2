@@ -21,7 +21,11 @@ export function createSoundController(
   scheduler: {
     set: (callback: () => void, delay: number) => ReturnType<typeof setTimeout>;
     clear: (timer: ReturnType<typeof setTimeout>) => void;
-  } = { set: setTimeout, clear: clearTimeout },
+  } = {
+    // Browser timers cannot be invoked as methods of this scheduler object.
+    set: (callback, delay) => setTimeout(callback, delay),
+    clear: (timer) => clearTimeout(timer),
+  },
 ) {
   let enabled = false;
   let active = true;
