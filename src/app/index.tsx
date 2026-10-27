@@ -1,24 +1,26 @@
 // src/app/(tabs)/index.tsx
 import { router, useFocusEffect, useNavigation } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   AppState,
-  Dimensions,
   Easing,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  useWindowDimensions,
   Vibration,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Cell,
   EngineState,
   GRID_COLS,
   GRID_ROWS,
+  PREVIEW_SIZE,
   GameMode,
   MASCOTS,
   MascotInfo,
@@ -44,14 +46,7 @@ import { useMenuMusic } from "../hooks/use-menu-music";
 import { useGameData } from "../data/GameDataProvider";
 import { NewGameConfirmation } from "../components/new-game-confirmation";
 import { GameControls } from "../components/game-controls";
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-
-const CELL_SIZE = Math.min(
-  Math.floor((SCREEN_WIDTH * 0.63) / GRID_COLS),
-  Math.floor((SCREEN_HEIGHT * 0.64) / GRID_ROWS)
-);
-const PREVIEW_CELL_SIZE = Math.floor(CELL_SIZE * 0.72);
+import { ARENA_PADDING, getGameArenaLayout, MASCOT_HEIGHT, MASCOT_WIDTH } from "../utils/game-layout";
 
 const NORMAL_BLOCKS = [
   {
@@ -229,6 +224,14 @@ function snapshotEngineState(state: EngineState): EngineState {
 
 export default function OrbitBlocksApp() {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const compactLandscape = width > height && height < 600;
+  const sidebarWidth = Math.min(340, Math.max(286, (width - insets.left - insets.right) * 0.45));
+  const [arenaSize, setArenaSize] = useState({ width: 0, height: 0 });
+  const { cellSize, previewCellSize, boardHeight, rightColumnWidth, mascotScale } = getGameArenaLayout(
+    arenaSize.width, arenaSize.height, { columns: GRID_COLS, rows: GRID_ROWS, previewColumns: PREVIEW_SIZE },
+  );
   const { language, setLanguage, t } = useLanguage();
   const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, currentGame, saveCurrentGame, finishGame, saveFailed } = useGameData();
 
@@ -246,8 +249,11 @@ export default function OrbitBlocksApp() {
     createNewGameState("CLASSIC")
   );
 
-  const [animX] = useState(() => new Animated.Value(2 * CELL_SIZE));
+  // Animate grid coordinates so a resize only changes their display scale.
+  const [animX] = useState(() => new Animated.Value(2));
   const [animY] = useState(() => new Animated.Value(0));
+  const pieceTranslateX = useMemo(() => Animated.multiply(animX, cellSize), [animX, cellSize]);
+  const pieceTranslateY = useMemo(() => Animated.multiply(animY, cellSize), [animY, cellSize]);
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
@@ -358,10 +364,10 @@ export default function OrbitBlocksApp() {
       const intervalMs = getFallIntervalMs(s.config, s.level);
 
       if (immediateX) {
-        animX.setValue(p.x * CELL_SIZE);
+        animX.setValue(p.x);
       } else {
         Animated.timing(animX, {
-          toValue: p.x * CELL_SIZE,
+          toValue: p.x,
           duration: 85,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
@@ -369,10 +375,10 @@ export default function OrbitBlocksApp() {
       }
 
       animY.stopAnimation();
-      animY.setValue(p.y * CELL_SIZE);
+      animY.setValue(p.y);
       if (canPlacePiece(s.grid, p, p.x, p.y + 1)) {
         Animated.timing(animY, {
-          toValue: (p.y + 1) * CELL_SIZE,
+          toValue: p.y + 1,
           duration: intervalMs,
           easing: Easing.linear,
           useNativeDriver: true,
@@ -454,8 +460,8 @@ export default function OrbitBlocksApp() {
     forceRender();
     setBannerText(null);
     if (fresh.activePiece) {
-      animX.setValue(fresh.activePiece.x * CELL_SIZE);
-      animY.setValue(fresh.activePiece.y * CELL_SIZE);
+      animX.setValue(fresh.activePiece.x);
+      animY.setValue(fresh.activePiece.y);
     }
     setScreen("GAME");
   };
@@ -485,8 +491,8 @@ export default function OrbitBlocksApp() {
     stopSounds();
     playSound("ui");
     forceRender();
-    animX.setValue(restored.activePiece!.x * CELL_SIZE);
-    animY.setValue(restored.activePiece!.y * CELL_SIZE);
+    animX.setValue(restored.activePiece!.x);
+    animY.setValue(restored.activePiece!.y);
     setScreen("GAME");
   };
 
@@ -496,7 +502,7 @@ export default function OrbitBlocksApp() {
       playSound("move");
       triggerHaptic(10);
       Animated.timing(animX, {
-        toValue: state.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x,
         duration: 80,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
@@ -511,7 +517,7 @@ export default function OrbitBlocksApp() {
       playSound("move");
       triggerHaptic(10);
       Animated.timing(animX, {
-        toValue: state.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x,
         duration: 80,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
@@ -526,7 +532,7 @@ export default function OrbitBlocksApp() {
       playSound("rotate");
       triggerHaptic(15);
       Animated.timing(animX, {
-        toValue: state.activePiece!.x * CELL_SIZE,
+        toValue: state.activePiece!.x,
         duration: 60,
         useNativeDriver: true,
       }).start();
@@ -986,31 +992,64 @@ export default function OrbitBlocksApp() {
       : null;
   const nextPiecePreview = getPiecePreview(gameState.nextPiece);
 
+  const scoreHeader = (
+    <View testID="game-score-header" style={styles.orangeScoreHeader}>
+      <Text style={styles.orangeHeaderText} adjustsFontSizeToFit minimumFontScale={0.65} numberOfLines={1}>
+        {t("score")} {gameState.score} · {t("high")} {topHighScore}
+      </Text>
+      <TouchableOpacity
+        style={styles.headerPausePill}
+        accessibilityLabel={t("pause")}
+        onPress={togglePause}>
+        <Text style={styles.headerPauseText}>
+          {gameState.status === "PAUSED" ? "▶" : "❚❚"}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+  const skyBanner = (
+    <View style={styles.spaceSkyBanner}>
+      <Text style={styles.spaceSkyStars}>
+        ✦ * · ★ {bannerText || t("level", { level: gameState.level })} · ✦
+      </Text>
+    </View>
+  );
+  const controls = (
+    <GameControls
+      enabled={gameState.status === "PLAYING"}
+      allowHardDrop={gameState.config.allowHardDrop}
+      onLeft={handleMoveLeft}
+      onDown={handleSoftDrop}
+      onRight={handleMoveRight}
+      onRotate={handleRotate}
+      onDrop={handleHardDrop}
+    />
+  );
+
   return (
-    <View style={styles.playScreen}>
-      <View style={styles.orangeScoreHeader}>
-          <Text style={styles.orangeHeaderText} adjustsFontSizeToFit minimumFontScale={0.65} numberOfLines={1}>
-          {t("score")} {gameState.score} · {t("high")} {topHighScore}
-        </Text>
-        <TouchableOpacity
-          style={styles.headerPausePill}
-          accessibilityLabel={t("pause")}
-          onPress={togglePause}
-        >
-          <Text style={styles.headerPauseText}>
-            {gameState.status === "PAUSED" ? "▶" : "❚❚"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.spaceSkyBanner}>
-        <Text style={styles.spaceSkyStars}>
-          ✦ * · ★ {bannerText || t("level", { level: gameState.level })} · ✦
-        </Text>
-      </View>
-
-      <View style={styles.arenaRow}>
-        <View style={styles.goldenBoardFrame}>
+    <View
+      nativeID="game-screen"
+      testID="game-screen"
+      style={[
+        styles.playScreen,
+        compactLandscape && styles.compactPlayScreen,
+        Platform.OS !== "web" && {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom + 14,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
+        },
+      ]}>
+      {!compactLandscape && scoreHeader}
+      {!compactLandscape && skyBanner}
+      <View
+        testID="game-arena"
+        style={[styles.arena, { opacity: arenaSize.width > 0 ? 1 : 0 }]}
+        onLayout={({ nativeEvent: { layout } }) => setArenaSize((previous) => (
+          previous.width === layout.width && previous.height === layout.height
+            ? previous : { width: layout.width, height: layout.height }
+        ))}>
+        <View testID="game-board" style={styles.goldenBoardFrame}>
           <View style={styles.boardInnerGrid}>
             {Array.from({ length: GRID_ROWS }).map((_, r) => (
               <View key={r} style={styles.boardRow}>
@@ -1038,7 +1077,7 @@ export default function OrbitBlocksApp() {
                       key={c}
                       style={[
                         styles.iceGridCell,
-                        { width: CELL_SIZE, height: CELL_SIZE },
+                        { width: cellSize, height: cellSize },
                         highContrast && {
                           borderColor: "#5C9EAD",
                           borderWidth: 1,
@@ -1046,9 +1085,9 @@ export default function OrbitBlocksApp() {
                       ]}
                     >
                       {settledCell.kind !== "EMPTY"
-                        ? renderBlockTile(settledCell, CELL_SIZE, false)
+                        ? renderBlockTile(settledCell, cellSize, false)
                         : ghostCell
-                        ? renderBlockTile(ghostCell, CELL_SIZE, true)
+                        ? renderBlockTile(ghostCell, cellSize, true)
                         : null}
                     </View>
                   );
@@ -1063,7 +1102,7 @@ export default function OrbitBlocksApp() {
                 style={[
                   styles.activePieceOverlay,
                   {
-                    transform: [{ translateX: animX }, { translateY: animY }],
+                    transform: [{ translateX: pieceTranslateX }, { translateY: pieceTranslateY }],
                   },
                 ]}
               >
@@ -1072,17 +1111,17 @@ export default function OrbitBlocksApp() {
                     key={idx}
                     style={{
                       position: "absolute",
-                      left: part.dx * CELL_SIZE,
-                      top: part.dy * CELL_SIZE,
-                      width: CELL_SIZE,
-                      height: CELL_SIZE,
+                      left: part.dx * cellSize,
+                      top: part.dy * cellSize,
+                      width: cellSize,
+                      height: cellSize,
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
                     {renderBlockTile(
                       { kind: part.kind, colorId: part.colorId },
-                      CELL_SIZE,
+                      cellSize,
                       false
                     )}
                   </View>
@@ -1092,7 +1131,7 @@ export default function OrbitBlocksApp() {
           </View>
         </View>
 
-        <View style={styles.rightColumn}>
+        <View style={[styles.rightColumn, { width: rightColumnWidth, height: boardHeight }]}>
           <View style={styles.previewWithBridgeRow}>
             <View style={styles.goldenBridgeTab} />
             <View style={styles.goldenPreviewFrame}>
@@ -1105,14 +1144,14 @@ export default function OrbitBlocksApp() {
                           style={[
                             styles.creamPreviewCell,
                             {
-                              width: PREVIEW_CELL_SIZE,
-                              height: PREVIEW_CELL_SIZE,
+                              width: previewCellSize,
+                              height: previewCellSize,
                             },
                           ]}
                         >
                           {renderBlockTile(
                             previewCell,
-                            PREVIEW_CELL_SIZE,
+                            previewCellSize,
                             false
                           )}
                         </View>
@@ -1123,26 +1162,25 @@ export default function OrbitBlocksApp() {
             </View>
           </View>
 
-          <View style={styles.competitorStage}>
-            <UfoCompetitorAvatar
-              mascot={mascot}
-              mood={gameState.mascotMood}
-              jumpAnim={mascotJumpAnim}
-            />
-            <Text style={styles.pilotNameTag}>{mascot.name}</Text>
+          <View testID="game-pilot" style={styles.competitorStage}>
+            <View style={[styles.scaledPilot, { width: MASCOT_WIDTH * mascotScale, height: MASCOT_HEIGHT * mascotScale }]}>
+              <View style={[styles.pilotArtwork, { transform: [{ scale: mascotScale }] }]}>
+                <UfoCompetitorAvatar mascot={mascot} mood={gameState.mascotMood} jumpAnim={mascotJumpAnim} />
+              </View>
+            </View>
+            <Text style={styles.pilotNameTag} numberOfLines={1}>{mascot.name}</Text>
           </View>
         </View>
       </View>
 
-      <GameControls
-        enabled={gameState.status === "PLAYING"}
-        allowHardDrop={gameState.config.allowHardDrop}
-        onLeft={handleMoveLeft}
-        onDown={handleSoftDrop}
-        onRight={handleMoveRight}
-        onRotate={handleRotate}
-        onDrop={handleHardDrop}
-      />
+      {compactLandscape ? (
+        <View testID="game-sidebar" style={[styles.gameSidebar, { width: sidebarWidth }]}>
+          {scoreHeader}
+          {skyBanner}
+          <View style={styles.sidebarSpacer} />
+          {controls}
+        </View>
+      ) : controls}
 
       <Modal
         visible={
@@ -1367,11 +1405,12 @@ const styles = StyleSheet.create({
   },
   playScreen: {
     flex: 1,
+    minHeight: 0,
     backgroundColor: "#020518",
-    paddingTop: Platform.OS === "ios" ? 48 : Platform.OS === "web" ? 70 : 34,
-    paddingBottom: 14,
-    justifyContent: "space-between",
   },
+  compactPlayScreen: { flexDirection: "row" },
+  gameSidebar: { justifyContent: "space-between" },
+  sidebarSpacer: { flex: 1 },
   orangeScoreHeader: {
     backgroundColor: "#F59B1A",
     borderTopWidth: 2,
@@ -1412,11 +1451,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 2,
   },
-  arenaRow: {
+  arena: {
+    flex: 1,
+    minHeight: 0,
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "center",
-    alignItems: "stretch",
-    paddingHorizontal: 8,
+    padding: ARENA_PADDING,
   },
   goldenBoardFrame: {
     backgroundColor: "#F5A623",
@@ -1549,11 +1590,13 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   competitorStage: {
-    width: PREVIEW_CELL_SIZE * 3 + 22,
+    width: "100%",
     alignItems: "center",
     justifyContent: "flex-end",
     marginTop: 12,
   },
+  scaledPilot: { alignItems: "center", justifyContent: "center" },
+  pilotArtwork: { width: MASCOT_WIDTH, height: 145, flexShrink: 0 },
   ufoSceneContainer: {
     width: 112,
     height: 145,
@@ -1736,6 +1779,7 @@ const styles = StyleSheet.create({
   pilotNameTag: {
     color: "#FDE68A",
     fontSize: 12,
+    lineHeight: 18,
     fontWeight: "800",
     marginTop: 2,
   },

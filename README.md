@@ -86,6 +86,22 @@ points. Buttons are disabled while paused or game over.
 - **Quick Play** (previously Comfort): faster falling, a landing guide, and an
   instant-drop button. Existing scores keep their original mode identifier.
 
+## Screen layout
+
+The board, preview, and pilot fit the space available after the score and controls
+are laid out. They resize when the window changes without restarting the game or
+changing the falling piece, preview, score, or saved progress. Controls retain
+their touch target sizes.
+
+Portrait keeps the score at the top and controls at the bottom. Short landscape
+screens place the score and controls in a panel beside the arena to leave more
+room for the board. Rotate and Drop stay to the left of the movement arrows in
+both layouts. Native safe-area insets and web safe-area CSS keep gameplay clear
+of screen cutouts and the home indicator.
+
+The app configuration allows portrait and landscape. An existing installed native
+build needs rebuilding to pick up that orientation setting.
+
 ## Checks
 
 ```sh
@@ -117,3 +133,10 @@ For controls, check Classic and Quick Play at small phone widths in all three
 languages. Verify the movement buttons stay together on the right, Rotate and
 Drop stay on the left, and every control performs its labeled action. Quick Play
 should show instant Drop; Classic should not. Check pressed and paused states too.
+For screen fitting, check 320×480 and 390×844 portrait, approximately 568×320 and
+844×390 landscape, and tablets in both orientations. The entire 6×10 board, 3×3
+preview, pilot, score, and controls should remain visible in Classic and Quick
+Play, in every language. Pause mid-fall, resize repeatedly, and verify the game
+stays paused with the same board, piece position, preview, and score. Resume and
+check movement, rotation, soft drop, and Quick Play's instant drop. Repeat on an
+Android and iOS device with a screen cutout and bottom gesture area.

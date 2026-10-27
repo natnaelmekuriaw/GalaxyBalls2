@@ -7,3 +7,10 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+#game-screen {
+  padding-top: calc(70px + env(safe-area-inset-top, 0px));
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  padding-left: env(safe-area-inset-left, 0px);
+}
