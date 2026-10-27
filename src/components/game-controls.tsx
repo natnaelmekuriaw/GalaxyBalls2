@@ -42,23 +42,23 @@ export function GameControls({ enabled, allowHardDrop, onLeft, onDown, onRight, 
   const { t } = useLanguage();
   return (
     <View testID="game-controls" style={styles.controls}>
-      <View testID="movement-controls" style={styles.movement}>
-        <ControlButton symbol="◀" label={t('left')} enabled={enabled} onPress={onLeft} />
-        <ControlButton symbol="▼" label={t('down')} hint={t('moveDownHint')} enabled={enabled} onPress={onDown} />
-        <ControlButton symbol="▶" label={t('right')} enabled={enabled} onPress={onRight} />
-      </View>
       <View testID="action-controls" style={styles.actions}>
         <ControlButton symbol="↻" label={t('rotate')} enabled={enabled} onPress={onRotate} style={styles.rotate} />
         {allowHardDrop && (
           <ControlButton symbol="⇓" label={t('drop')} hint={t('instantDropHint')} enabled={enabled} onPress={onDrop} style={styles.drop} />
         )}
       </View>
+      <View testID="movement-controls" style={styles.movement}>
+        <ControlButton symbol="◀" label={t('left')} enabled={enabled} onPress={onLeft} />
+        <ControlButton symbol="▼" label={t('down')} hint={t('moveDownHint')} enabled={enabled} onPress={onDown} />
+        <ControlButton symbol="▶" label={t('right')} enabled={enabled} onPress={onRight} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  controls: { width: '100%', maxWidth: 520, alignSelf: 'center', flexDirection: 'row', gap: 16, paddingHorizontal: 8, paddingTop: 4 },
+  controls: { width: '100%', maxWidth: 520, alignSelf: 'flex-end', flexDirection: 'row', gap: 16, paddingHorizontal: 8, paddingTop: 4 },
   movement: { flex: 3, flexDirection: 'row', gap: 4 },
   actions: { flex: 2, flexDirection: 'row', gap: 6 },
   button: { flex: 1, minWidth: 48, minHeight: 56, paddingHorizontal: 2, paddingVertical: 4, gap: 2, borderRadius: 12, borderWidth: 2, borderColor: '#F5A623', backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
