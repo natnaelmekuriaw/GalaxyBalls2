@@ -47,8 +47,9 @@ advance rather than a final win screen.
 
 ## Saved game data
 
-The app saves your selected language, game audio switch, menu music switch, and
-the top five completed-run scores for Classic and Quick Play. It restores them
+The app saves your selected language, game audio, menu music, vibration, block
+symbols, rotation choice, and the top five completed-run scores for Classic and
+Quick Play. It restores them
 before showing the menus or starting audio. An unfinished game appears as
 **Resume Game** on the main menu, with its mode, score, and level. It stays paused
 until you choose Resume Game.
@@ -82,9 +83,27 @@ sit in a separate group on the left, with different colors. The controls stay
 near the right edge on wider screens and use touch targets at least 48 by 56
 points. Buttons are disabled while paused or game over.
 
+Tap a movement arrow for one step, or hold it to repeat after a short delay.
+Releasing the button, sliding away, pausing, leaving gameplay, or backgrounding
+stops the hold. Rotate and instant Drop remain single actions. A resumed game
+keeps its original rotation rules; the saved rotation preference applies to new
+games.
+
 - **Classic:** slower falling, no landing guide, and no instant drop.
 - **Quick Play** (previously Comfort): faster falling, a landing guide, and an
   instant-drop button. Existing scores keep their original mode identifier.
+
+## Gameplay feedback
+
+The level progress bar shows how many points you have toward the next level.
+Matches and special clears show their cleared-block count and score gain, with
+a brief colored board outline. Star, Bomb, and Flash also describe their effect.
+Cascades and level-ups appear together when the same landing triggers both.
+A Star with no nearby colored target explains why it did not clear blocks.
+Feedback stays visible while paused and clears shortly after play continues.
+
+The web navigation contains Game and Games. Settings contains player preferences;
+engine checks run through `npm test` alongside the other automated checks.
 
 ## Screen layout
 
@@ -115,7 +134,8 @@ the title screen, rules, high scores, gameplay, and pause screen. Check a small 
 viewport and confirm that selecting a language returns to the translated main menu.
 Open **Other Games** below Quick Play to see the collection. Galaxy Balls is the
 only entry for now; opening it returns to the main menu to choose a play mode.
-For saving, change the language and both sound switches, close and reopen the
+For saving, change the language, both sound switches, vibration, block symbols,
+and rotation choice, then close and reopen the
 app, and check they are restored. Finish a scoring run in each mode and confirm
 its Top 5 entry survives reopening. The data tests also cover delayed reads,
 rapid changes, corrupt saves, write ordering, storage failures, and retrying.
@@ -133,6 +153,15 @@ For controls, check Classic and Quick Play at small phone widths in all three
 languages. Verify the movement buttons stay together on the right, Rotate and
 Drop stay on the left, and every control performs its labeled action. Quick Play
 should show instant Drop; Classic should not. Check pressed and paused states too.
+Hold each movement button, then release or slide off it: repeating should stop
+without an extra move. Check pausing, leaving gameplay, backgrounding, and
+returning to play; an old hold must never restart. Holding Rotate or Drop should
+perform one action. Verify saved rotation settings are unchanged after resuming a
+game with different rotation rules.
+For feedback, trigger matches, Star, Bomb, Flash, a multi-wave cascade, and a level
+advance. Verify simultaneous outcomes remain visible together, clear counts and
+score gains agree with the board, and progress resets at a new level. Check a Star
+with no colored target too. Repeat feedback checks in all three languages.
 For screen fitting, check 320×480 and 390×844 portrait, approximately 568×320 and
 844×390 landscape, and tablets in both orientations. The entire 6×10 board, 3×3
 preview, pilot, score, and controls should remain visible in Classic and Quick
