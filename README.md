@@ -7,7 +7,7 @@ Tap the language button on the home screen to open language settings, or open
 **Settings → Language**, and select **English**, **አማርኛ**, or **Afaan Oromoo**.
 The home button always shows the currently selected language.
 The game menus, rules, controls, score displays, and game messages update immediately.
-The selection lasts for the current app session; saving preferences is planned as a separate change.
+The selected language is saved locally and restored when the app opens again.
 
 Amharic uses bundled Noto Sans Ethiopic regular and bold fonts, available offline.
 Their SIL Open Font License is included in `assets/fonts/OFL.txt`.
@@ -26,8 +26,8 @@ shape and colors. Four-block experiments remain disabled.
 Short original effects play for menus, game start, movement, rotation, landing,
 stones, matches, cascades, bomb/flash/star pieces, level changes, and game over.
 Open **Settings → Game audio** to mute or enable them; **Test sound** plays a
-short preview. This preference lasts for the current session until local saving
-is added. Sounds stop when the app backgrounds or the player pauses the game.
+short preview. Both game audio and menu music preferences are saved locally.
+Sounds stop when the app backgrounds or the player pauses the game.
 Device silent mode and media volume are respected. No microphone permission is needed.
 
 The small PCM WAV sound pack is bundled for offline playback. Rebuild it with
@@ -45,6 +45,23 @@ level, its clear sound finishes before the victory jingle. Game over plays a
 distinct loss sound. Runs are endless survival, so victory feedback marks a level
 advance rather than a final win screen.
 
+## Saved game data
+
+The app saves your selected language, game audio switch, menu music switch, and
+the top five completed-run scores for Classic and Quick Play. It restores them
+before showing the menus or starting audio. Active games start fresh on reopening.
+
+Data stays on the device using AsyncStorage. On web, it stays in the current
+browser for that site. Clearing app or browser data removes the saved scores and
+preferences. Rebuild an existing development client after adding AsyncStorage;
+the compatible version is included in Expo Go for SDK 58.
+
+Saving starts immediately after a preference changes or a run ends. Writes are
+ordered, and failed writes retry when the app backgrounds or another change is
+saved. Invalid saved fields fall back to defaults. If storage cannot be read,
+that session works in memory and leaves the unread save untouched. Settings
+shows a message if changes cannot be saved.
+
 ## Game modes
 
 - **Classic:** slower falling, no landing guide, and no instant drop.
@@ -56,8 +73,7 @@ advance rather than a final win screen.
 ```sh
 npm run lint
 npx tsc --noEmit
-node --experimental-strip-types --test tests/translations.test.mjs
-npm run test:sounds
+npm test
 ```
 
 To check the interface, run `npm run web`, choose each language in Settings, and visit
@@ -65,3 +81,7 @@ the title screen, rules, high scores, gameplay, and pause screen. Check a small 
 viewport and confirm that selecting a language returns to the translated main menu.
 Open **Other Games** below Quick Play to see the collection. Galaxy Balls is the
 only entry for now; opening it returns to the main menu to choose a play mode.
+For saving, change the language and both sound switches, close and reopen the
+app, and check they are restored. Finish a scoring run in each mode and confirm
+its Top 5 entry survives reopening. The data tests also cover delayed reads,
+rapid changes, corrupt saves, write ordering, storage failures, and retrying.
