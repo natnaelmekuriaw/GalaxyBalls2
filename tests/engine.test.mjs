@@ -1,3 +1,4 @@
+import test from 'node:test';
 import {
   createEmptyGrid,
   createNewGameState,
@@ -8,26 +9,24 @@ import {
   generatePiece,
   getGhostY,
   canPlacePiece,
-  type GameMode,
-  type ActivePiece,
   lockActivePieceAndResolve,
   movePiece,
   resolveCascades,
   resolveSpecialLanding,
   rotateActivePiece,
-} from "./galaxyEngine";
+} from "../src/engine/galaxyEngine.ts";
 
-function assert(condition: boolean, message: string) {
+function assert(condition, message) {
   if (!condition) {
     throw new Error(`❌ ASSERTION FAILED: ${message}`);
   }
 }
 
-export function runAllEngineTests(): { passed: number; log: string[] } {
-  const log: string[] = [];
+function runEngineChecks() {
+  const log = [];
   let passed = 0;
 
-  const record = (name: string) => {
+  const record = (name) => {
     passed++;
     log.push(`✅ ${name}`);
   };
@@ -167,7 +166,7 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
     const state = createNewGameState("CLASSIC", {}, 12345);
     // Move all the way left
     for (let i = 0; i < 10; i++) movePiece(state, -1, 0);
-    assert(state.activePiece!.x >= 0, "Piece cannot exit left boundary");
+    assert(state.activePiece.x >= 0, "Piece cannot exit left boundary");
     rotateActivePiece(state);
     assert(state.activePiece !== null, "Rotation near boundary stays valid");
 
@@ -189,7 +188,7 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
 
   // Each preview block corresponds to exactly one queued block.
   {
-    const shapes: ActivePiece["cells"][] = [
+    const shapes = [
       [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 0 }, { dx: 0, dy: 1, kind: "NORMAL", colorId: 1 }],
       [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 1 }, { dx: 1, dy: 0, kind: "STONE" }],
       [{ dx: 0, dy: 0, kind: "NORMAL", colorId: 0 }, { dx: 0, dy: 1, kind: "NORMAL", colorId: 1 }, { dx: 0, dy: 2, kind: "NORMAL", colorId: 2 }],
@@ -200,7 +199,7 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
       [{ dx: 0, dy: 0, kind: "STAR" }],
     ];
     for (const cells of shapes) {
-      const piece: ActivePiece = { x: 2, y: 0, cells, isSingleSpecial: cells.length === 1 };
+      const piece = { x: 2, y: 0, cells, isSingleSpecial: cells.length === 1 };
       const original = JSON.stringify(piece);
       const preview = getPiecePreview(piece);
       const occupied = preview.flat().filter((cell) => cell.kind !== "EMPTY");
@@ -234,11 +233,11 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
         const expectedCells = JSON.stringify(state.nextPiece.cells);
         const expectedPreview = JSON.stringify(getPiecePreview(state.nextPiece));
         if (state.nextPiece.cells.length === 3) sawThreeBlockPiece = true;
-        state.activePiece!.y = getGhostY(state.grid, state.activePiece!);
+        state.activePiece.y = getGhostY(state.grid, state.activePiece);
         const summary = lockActivePieceAndResolve(state);
         assert(!summary.gameOver && state.activePiece !== null, "Queued piece should spawn on a clear board");
-        assert(JSON.stringify(state.activePiece!.cells) === expectedCells, "Spawned piece must have the previewed blocks, colors, and offsets");
-        assert(JSON.stringify(getPiecePreview(state.activePiece!)) === expectedPreview, "Queued and spawned previews must be identical");
+        assert(JSON.stringify(state.activePiece.cells) === expectedCells, "Spawned piece must have the previewed blocks, colors, and offsets");
+        assert(JSON.stringify(getPiecePreview(state.activePiece)) === expectedPreview, "Queued and spawned previews must be identical");
       }
     }
     assert(sawThreeBlockPiece, "Three-block groups must be generated during normal play");
@@ -247,28 +246,28 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
 
   // Verify the actual new-game queue without changing its score, level, or pieces.
   {
-    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"] as GameMode[]) {
+    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"]) {
       for (let seed = 1; seed <= 64; seed++) {
         const state = createNewGameState(mode, {}, seed);
-        assert(state.activePiece!.cells.length === 2, "The first group should have two blocks");
+        assert(state.activePiece.cells.length === 2, "The first group should have two blocks");
         assert(state.nextPiece.cells.length === 3, "A new game must preview three blocks immediately");
         const expected = JSON.stringify(state.nextPiece.cells);
-        state.activePiece!.y = getGhostY(state.grid, state.activePiece!);
+        state.activePiece.y = getGhostY(state.grid, state.activePiece);
         const result = lockActivePieceAndResolve(state);
         assert(!result.gameOver, "The first drop must leave room for the queued piece");
         assert(state.level === 1 && state.score === 0, "Piece variety must not require a score or level threshold");
-        assert(state.activePiece!.cells.length === 3, "The second falling group must have all three previewed blocks");
-        assert(JSON.stringify(state.activePiece!.cells) === expected, "The opening preview and second falling group must match exactly");
+        assert(state.activePiece.cells.length === 3, "The second falling group must have all three previewed blocks");
+        assert(JSON.stringify(state.activePiece.cells) === expected, "The opening preview and second falling group must match exactly");
       }
     }
     record("12. Every new game previews and drops a three-block piece at level 1");
   }
 
   {
-    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"] as GameMode[]) {
+    for (const mode of ["CLASSIC", "COMFORT", "PRACTICE"]) {
       const config = { ...createNewGameState(mode).config, specialChanceBase: 0, stoneChanceBase: 0 };
-      const sizes = new Set<number>();
-      const shapes = new Set<string>();
+      const sizes = new Set();
+      const shapes = new Set();
       for (let seed = 1; seed <= 1024; seed++) {
         const piece = generatePiece(config, 1, seed, 0).piece;
         sizes.add(piece.cells.length);
@@ -286,3 +285,9 @@ export function runAllEngineTests(): { passed: number; log: string[] } {
 
   return { passed, log };
 }
+
+test('matching, specials, rotation, drops and all piece-generation rules', (t) => {
+  const { passed, log } = runEngineChecks();
+  t.diagnostic(`${passed} engine checks passed`);
+  log.forEach((line) => t.diagnostic(line));
+});

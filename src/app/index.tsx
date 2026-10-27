@@ -36,7 +36,6 @@ import {
   rotateActivePiece,
   stepGravityTick,
 } from "../engine/galaxyEngine";
-import { runAllEngineTests } from "../engine/galaxyEngine.test";
 import { GameText as Text } from "../components/game-text";
 import { useLanguage } from "../i18n/LanguageProvider";
 import { LANGUAGES } from "../i18n/translations";
@@ -266,7 +265,6 @@ export default function OrbitBlocksApp() {
   const highContrast = false;
   const experimental4Block = false;
 
-  const [testReport, setTestReport] = useState<string[] | null>(null);
   const [pendingNewGameMode, setPendingNewGameMode] = useState<GameMode | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
   const stateRef = useRef<EngineState>(gameState);
@@ -962,24 +960,6 @@ export default function OrbitBlocksApp() {
           <Text style={styles.toggleValue}>{t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}</Text>
         </TouchableOpacity>
         <Text style={styles.infoBody}>{t("rotationHint")}</Text>
-        <TouchableOpacity
-          style={styles.darkMenuBtn}
-          onPress={() => {
-            const res = runAllEngineTests();
-            setTestReport(res.log);
-          }}
-        >
-          <Text style={styles.darkMenuBtnText}>🧪 {t("runTests")}</Text>
-        </TouchableOpacity>
-        {testReport && (
-          <View style={styles.infoCard}>
-            {testReport.map((line, idx) => (
-              <Text key={idx} style={styles.testLine}>
-                {line}
-              </Text>
-            ))}
-          </View>
-        )}
         <TouchableOpacity
           style={styles.goldMenuBtn}
           onPress={() => showScreen("TITLE")}
@@ -1895,11 +1875,6 @@ const styles = StyleSheet.create({
     color: "#F59B1A",
     fontSize: 14,
     fontWeight: "900",
-  },
-  testLine: {
-    color: "#4ADE80",
-    fontSize: 12,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
   },
   languageOptions: {
     gap: 8,
