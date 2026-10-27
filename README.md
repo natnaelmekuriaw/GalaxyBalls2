@@ -49,15 +49,24 @@ advance rather than a final win screen.
 
 The app saves your selected language, game audio switch, menu music switch, and
 the top five completed-run scores for Classic and Quick Play. It restores them
-before showing the menus or starting audio. Active games start fresh on reopening.
+before showing the menus or starting audio. An unfinished game appears as
+**Resume Game** on the main menu, with its mode, score, and level. It stays paused
+until you choose Resume Game.
+
+The current board, falling piece position and colors, next-piece preview, score,
+level, mode, rotation rules, and random sequence are saved after every game action
+and gravity step. Pausing, returning to the main menu, leaving the game tab, or
+backgrounding also keeps the checkpoint. Starting a new game replaces it. Game
+over saves the high score and clears the unfinished game together.
 
 Data stays on the device using AsyncStorage. On web, it stays in the current
 browser for that site. Clearing app or browser data removes the saved scores and
 preferences. Rebuild an existing development client after adding AsyncStorage;
 the compatible version is included in Expo Go for SDK 58.
 
-Saving starts immediately after a preference changes or a run ends. Writes are
-ordered, and failed writes retry when the app backgrounds or another change is
+Saving starts immediately after a preference or game state changes. Writes are
+ordered, with only the latest pending snapshot retained during rapid input.
+Failed writes retry when the app backgrounds or another change is
 saved. Invalid saved fields fall back to defaults. If storage cannot be read,
 that session works in memory and leaves the unread save untouched. Settings
 shows a message if changes cannot be saved.
@@ -85,3 +94,9 @@ For saving, change the language and both sound switches, close and reopen the
 app, and check they are restored. Finish a scoring run in each mode and confirm
 its Top 5 entry survives reopening. The data tests also cover delayed reads,
 rapid changes, corrupt saves, write ordering, storage failures, and retrying.
+For resuming, move and rotate pieces, place some blocks, pause, then close and
+reopen the app. Resume Game should restore the board, current piece, preview,
+score, and mode. Continue playing and verify the next piece follows the saved
+preview. Finish the run and reopen again: its score should remain in Top 5 and
+Resume Game should be gone. Existing saved language, audio settings, and scores
+remain compatible.
