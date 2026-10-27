@@ -159,7 +159,7 @@ test('rapid setting changes and scores are saved in order even when the first wr
   assert.equal(writesStarted, 1);
   finishFirst();
   await store.flush();
-  assert.equal(writesStarted, 5);
+  assert.equal(writesStarted, 2, 'Only the in-flight save and latest pending snapshot should be written');
   assert.deepEqual(JSON.parse(storage.value), store.getSnapshot().data);
   const reopened = createGameDataStore(storage);
   await reopened.load();
