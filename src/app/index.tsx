@@ -1,5 +1,5 @@
 // src/app/(tabs)/index.tsx
-import { router, useNavigation } from "expo-router";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -228,7 +228,7 @@ function snapshotEngineState(state: EngineState): EngineState {
 export default function OrbitBlocksApp() {
   const navigation = useNavigation();
   const { language, setLanguage, t } = useLanguage();
-  const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, recordHighScore, saveFailed } = useGameData();
+  const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, currentGame, saveCurrentGame, finishGame, saveFailed } = useGameData();
 
   useEffect(() => {
     navigation.setOptions({
@@ -263,10 +263,15 @@ export default function OrbitBlocksApp() {
   const stateRef = useRef<EngineState>(gameState);
 
   const forceRender = useCallback(() => {
+    saveCurrentGame(stateRef.current);
     setGameState(snapshotEngineState(stateRef.current));
-  }, []);
+  }, [saveCurrentGame]);
 
   const showScreen = (target: typeof screen) => {
+    if (screen === "GAME" && stateRef.current.status === "PLAYING") {
+      stateRef.current.status = "PAUSED";
+      forceRender();
+    }
     stopSounds();
     menuMusic.start();
     playSound("ui");
@@ -338,8 +343,8 @@ export default function OrbitBlocksApp() {
       setBannerText(`+${summary.scoreDelta}`);
       triggerHaptic(20);
     }
-    if (summary.gameOver) recordHighScore(state.config.mode, state.score, state.level);
-  }, [playSoundSequence, triggerHaptic, t, recordHighScore]);
+    if (summary.gameOver) finishGame(state);
+  }, [playSoundSequence, triggerHaptic, t, finishGame]);
 
   const syncSmoothPieceAnimation = useCallback(
     (s: EngineState, immediateX = false) => {
@@ -375,13 +380,20 @@ export default function OrbitBlocksApp() {
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState !== "active" && stateRef.current.status === "PLAYING") {
+      if (screen === "GAME" && nextAppState !== "active" && stateRef.current.status === "PLAYING") {
         stateRef.current.status = "PAUSED";
         forceRender();
       }
     });
     return () => sub.remove();
-  }, [forceRender]);
+  }, [forceRender, screen]);
+
+  useFocusEffect(useCallback(() => () => {
+    if (screen === "GAME" && stateRef.current.status === "PLAYING") {
+      stateRef.current.status = "PAUSED";
+      forceRender();
+    }
+  }, [forceRender, screen]));
 
   useEffect(() => {
     if (screen !== "GAME" || gameState.status !== "PLAYING") {
@@ -434,11 +446,28 @@ export default function OrbitBlocksApp() {
       experimentalFourBlockPieces: experimental4Block,
     });
     stateRef.current = fresh;
-    setGameState(snapshotEngineState(fresh));
+    forceRender();
+    setBannerText(null);
     if (fresh.activePiece) {
       animX.setValue(fresh.activePiece.x * CELL_SIZE);
       animY.setValue(fresh.activePiece.y * CELL_SIZE);
     }
+    setScreen("GAME");
+  };
+
+  const resumeSavedGame = () => {
+    if (!currentGame) return;
+    const restored = { ...snapshotEngineState(currentGame), config: { ...currentGame.config } };
+    restored.status = "PLAYING";
+    stateRef.current = restored;
+    setRotationStrategy(restored.config.rotationMode);
+    setBannerText(null);
+    menuMusic.stop();
+    stopSounds();
+    playSound("ui");
+    forceRender();
+    animX.setValue(restored.activePiece!.x * CELL_SIZE);
+    animY.setValue(restored.activePiece!.y * CELL_SIZE);
     setScreen("GAME");
   };
 
@@ -645,6 +674,26 @@ export default function OrbitBlocksApp() {
           </View>
         </View>
         <View style={styles.menuButtonList}>
+          {currentGame && (
+            <View style={{ gap: 6 }}>
+              <TouchableOpacity
+                style={styles.goldMenuBtn}
+                accessibilityRole="button"
+                accessibilityLabel={t("continueGame")}
+                onPress={resumeSavedGame}
+              >
+                <Text style={styles.goldMenuBtnText}>▶ {t("continueGame")}</Text>
+                <Text style={[styles.modeHint, { color: "#302009" }]}>
+                  {t("savedRun", {
+                    mode: t(currentGame.config.mode === "CLASSIC" ? "classic" : currentGame.config.mode === "COMFORT" ? "comfort" : "practice"),
+                    score: currentGame.score,
+                    level: currentGame.level,
+                  })}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.modeHint}>{t("replaceSavedGameHint")}</Text>
+            </View>
+          )}
           <TouchableOpacity
             style={styles.goldMenuBtn}
             onPress={() => startNewGame("CLASSIC")}

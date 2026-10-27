@@ -9,6 +9,9 @@ export type Language = (typeof LANGUAGES)[number]['code'];
 const en = {
   playClassic: 'PLAY CLASSIC (6×10)',
   playComfort: 'QUICK PLAY',
+  continueGame: 'RESUME GAME',
+  savedRun: '{mode} · {score} pts · Level {level}',
+  replaceSavedGameHint: 'Starting a new game replaces this saved game.',
   classicHint: 'Slower falling · no landing guide or instant drop',
   quickPlayHint: 'Faster falling · landing guide · instant drop',
   otherGames: 'OTHER GAMES',
@@ -84,6 +87,9 @@ type Translations = Record<TranslationKey, string>;
 const am: Translations = {
   playClassic: 'መደበኛ ጨዋታ (6×10)',
   playComfort: 'ፈጣን ጨዋታ',
+  continueGame: 'ጨዋታውን ቀጥል',
+  savedRun: '{mode} · {score} ነጥብ · ደረጃ {level}',
+  replaceSavedGameHint: 'አዲስ ጨዋታ መጀመር የተቀመጠውን ጨዋታ ይተካል።',
   classicHint: 'ቀስ ያለ መውደቅ · የማረፊያ መመሪያ ወይም ፈጣን ማሳረፍ የለም',
   quickPlayHint: 'ፈጣን መውደቅ · የማረፊያ መመሪያ · ፈጣን ማሳረፍ',
   otherGames: 'ሌሎች ጨዋታዎች',
@@ -156,6 +162,9 @@ const am: Translations = {
 const om: Translations = {
   playClassic: 'TAPHAA IDILEE (6×10)',
   playComfort: 'TAPHAA SAFFISAA',
+  continueGame: 'TAPHA ITTI FUFI',
+  savedRun: '{mode} · Qabxii {score} · Sadarkaa {level}',
+  replaceSavedGameHint: 'Tapha haaraa jalqabuun tapha kuufame kana bakka buusa.',
   classicHint: 'Suuta buʼa · qajeelfama qubachiisaa fi buʼiinsa battalaa hin qabu',
   quickPlayHint: 'Saffisaan buʼa · qajeelfama qubachiisaa · buʼiinsa battalaa',
   otherGames: 'TAPHOOTA BIROO',
