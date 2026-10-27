@@ -1,5 +1,7 @@
 import { useFonts } from 'expo-font';
-import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, useCallback, useContext, useMemo, type PropsWithChildren } from 'react';
+
+import { useGameData } from '@/data/GameDataProvider';
 
 import { translate, type Language, type TranslationKey } from './translations';
 
@@ -13,7 +15,7 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: PropsWithChildren) {
-  const [language, setLanguage] = useState<Language>('en');
+  const { language, setLanguage } = useGameData();
   const [fontsLoaded] = useFonts({
     NotoSansEthiopic: require('../../assets/fonts/NotoSansEthiopic-Regular.ttf'),
     NotoSansEthiopicBold: require('../../assets/fonts/NotoSansEthiopic-Bold.ttf'),
@@ -22,7 +24,7 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     (key: TranslationKey, values?: Record<string, string | number>) => translate(language, key, values),
     [language],
   );
-  const value = useMemo(() => ({ language, setLanguage, fontsLoaded, t }), [language, fontsLoaded, t]);
+  const value = useMemo(() => ({ language, setLanguage, fontsLoaded, t }), [language, setLanguage, fontsLoaded, t]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
