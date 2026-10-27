@@ -233,7 +233,12 @@ export default function OrbitBlocksApp() {
     arenaSize.width, arenaSize.height, { columns: GRID_COLS, rows: GRID_ROWS, previewColumns: PREVIEW_SIZE },
   );
   const { language, setLanguage, t } = useLanguage();
-  const { soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled, highScores, currentGame, saveCurrentGame, finishGame, saveFailed } = useGameData();
+  const {
+    soundsEnabled, setSoundsEnabled, menuMusicEnabled, setMenuMusicEnabled,
+    hapticsEnabled, setHapticsEnabled, colorblindGlyphs, setColorblindGlyphs,
+    rotationMode: rotationStrategy, setRotationMode: setRotationStrategy,
+    highScores, currentGame, saveCurrentGame, finishGame, saveFailed,
+  } = useGameData();
 
   useEffect(() => {
     navigation.setOptions({
@@ -256,14 +261,9 @@ export default function OrbitBlocksApp() {
   const pieceTranslateY = useMemo(() => Animated.multiply(animY, cellSize), [animY, cellSize]);
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
-  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled);
   const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME");
-  const [colorblindGlyphs, setColorblindGlyphs] = useState(true);
   const highContrast = false;
-  const [rotationStrategy, setRotationStrategy] = useState<
-    "GEOMETRY_90" | "COLOR_CYCLE"
-  >("GEOMETRY_90");
   const experimental4Block = false;
 
   const [testReport, setTestReport] = useState<string[] | null>(null);
@@ -485,7 +485,6 @@ export default function OrbitBlocksApp() {
     const restored = { ...snapshotEngineState(currentGame), config: { ...currentGame.config } };
     restored.status = "PLAYING";
     stateRef.current = restored;
-    setRotationStrategy(restored.config.rotationMode);
     setBannerText(null);
     menuMusic.stop();
     stopSounds();
@@ -918,6 +917,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={t("haptics")}
+          accessibilityState={{ checked: hapticsEnabled }}
+          aria-checked={hapticsEnabled}
           onPress={() => {
             playSound("ui");
             setHapticsEnabled(!hapticsEnabled);
@@ -930,6 +933,10 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="switch"
+          accessibilityLabel={t("emblems")}
+          accessibilityState={{ checked: colorblindGlyphs }}
+          aria-checked={colorblindGlyphs}
           onPress={() => {
             playSound("ui");
             setColorblindGlyphs(!colorblindGlyphs);
@@ -942,6 +949,8 @@ export default function OrbitBlocksApp() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.toggleRow}
+          accessibilityRole="button"
+          accessibilityLabel={`${t("rotationMode")}: ${t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}`}
           onPress={() => {
             playSound("ui");
             setRotationStrategy(
@@ -952,6 +961,7 @@ export default function OrbitBlocksApp() {
           <Text style={styles.toggleLabel}>{t("rotationMode")}</Text>
           <Text style={styles.toggleValue}>{t(rotationStrategy === "GEOMETRY_90" ? "geometryRotation" : "colorRotation")}</Text>
         </TouchableOpacity>
+        <Text style={styles.infoBody}>{t("rotationHint")}</Text>
         <TouchableOpacity
           style={styles.darkMenuBtn}
           onPress={() => {

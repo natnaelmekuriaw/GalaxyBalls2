@@ -17,6 +17,56 @@ function memoryStorage(initial = null) {
 
 const entry = (score, level = 1) => ({ alias: 'YOU', score, level, date: '2026-10-26' });
 
+test('vibration, symbols and both rotation choices survive reopening without changing a saved game', async () => {
+  for (const haptics of [false, true]) for (const glyphs of [false, true]) for (const rotation of ['GEOMETRY_90', 'COLOR_CYCLE']) {
+    const storage = memoryStorage();
+    const store = createGameDataStore(storage);
+    await store.load();
+    store.setLanguage('am');
+    store.setSoundsEnabled(false);
+    store.setHapticsEnabled(haptics);
+    store.setColorblindGlyphs(glyphs);
+    store.setRotationMode(rotation);
+    store.saveCurrentGame(createNewGameState('COMFORT', { rotationMode: 'GEOMETRY_90' }, 123));
+    store.recordHighScore('CLASSIC', 500, 3, '2026-10-26');
+    await store.flush();
+    const reopened = createGameDataStore(storage);
+    await reopened.load();
+    const saved = reopened.getSnapshot().data;
+    assert.equal(saved.hapticsEnabled, haptics);
+    assert.equal(saved.colorblindGlyphs, glyphs);
+    assert.equal(saved.rotationMode, rotation);
+    assert.equal(saved.currentGame.config.rotationMode, 'GEOMETRY_90');
+    assert.equal(saved.language, 'am');
+    assert.equal(saved.soundsEnabled, false);
+    assert.equal(saved.highScores.CLASSIC[0].score, 500);
+  }
+});
+
+test('older saves gain preference defaults while retaining their game, scores and existing choices', () => {
+  const older = { version: 1, language: 'om', soundsEnabled: false, menuMusicEnabled: false,
+    currentGame: createNewGameState('CLASSIC', { rotationMode: 'COLOR_CYCLE' }, 123), highScores: { CLASSIC: [entry(400)] } };
+  const saved = parseGameData(JSON.stringify(older));
+  assert.equal(saved.hapticsEnabled, true);
+  assert.equal(saved.colorblindGlyphs, true);
+  assert.equal(saved.rotationMode, 'GEOMETRY_90');
+  assert.equal(saved.currentGame.config.rotationMode, 'COLOR_CYCLE');
+  assert.equal(saved.currentGame.status, 'PAUSED');
+  assert.equal(saved.language, 'om');
+  assert.equal(saved.menuMusicEnabled, false);
+  assert.equal(saved.highScores.CLASSIC[0].score, 400);
+});
+
+test('corrupt preference fields fall back independently without discarding valid fields', () => {
+  const saved = parseGameData(JSON.stringify({ version: 1, hapticsEnabled: 'false', colorblindGlyphs: false,
+    rotationMode: 'unknown', language: 'am', soundsEnabled: false }));
+  assert.equal(saved.hapticsEnabled, true);
+  assert.equal(saved.colorblindGlyphs, false);
+  assert.equal(saved.rotationMode, 'GEOMETRY_90');
+  assert.equal(saved.language, 'am');
+  assert.equal(saved.soundsEnabled, false);
+});
+
 test('a fresh install uses the existing defaults without writing during startup', async () => {
   const storage = memoryStorage();
   const store = createGameDataStore(storage);
