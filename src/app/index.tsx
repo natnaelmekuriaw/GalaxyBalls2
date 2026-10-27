@@ -42,6 +42,7 @@ import { getResolutionSounds } from "../audio/soundEvents";
 import { useGameSounds } from "../hooks/use-game-sounds";
 import { useMenuMusic } from "../hooks/use-menu-music";
 import { useGameData } from "../data/GameDataProvider";
+import { NewGameConfirmation } from "../components/new-game-confirmation";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -259,6 +260,7 @@ export default function OrbitBlocksApp() {
   const experimental4Block = false;
 
   const [testReport, setTestReport] = useState<string[] | null>(null);
+  const [pendingNewGameMode, setPendingNewGameMode] = useState<GameMode | null>(null);
   const [bannerText, setBannerText] = useState<string | null>(null);
   const stateRef = useRef<EngineState>(gameState);
 
@@ -268,6 +270,7 @@ export default function OrbitBlocksApp() {
   }, [saveCurrentGame]);
 
   const showScreen = (target: typeof screen) => {
+    setPendingNewGameMode(null);
     if (screen === "GAME" && stateRef.current.status === "PLAYING") {
       stateRef.current.status = "PAUSED";
       forceRender();
@@ -438,6 +441,7 @@ export default function OrbitBlocksApp() {
   }, [bannerText]);
 
   const startNewGame = (mode: GameMode) => {
+    setPendingNewGameMode(null);
     menuMusic.stop();
     stopSounds();
     playSound("start");
@@ -453,6 +457,20 @@ export default function OrbitBlocksApp() {
       animY.setValue(fresh.activePiece.y * CELL_SIZE);
     }
     setScreen("GAME");
+  };
+
+  const requestNewGame = (mode: GameMode) => {
+    if (currentGame) {
+      playSound("ui");
+      setPendingNewGameMode(mode);
+    } else {
+      startNewGame(mode);
+    }
+  };
+
+  const cancelNewGame = () => {
+    playSound("ui");
+    setPendingNewGameMode(null);
   };
 
   const resumeSavedGame = () => {
@@ -631,6 +649,7 @@ export default function OrbitBlocksApp() {
     const heroMascot = MASCOTS[0];
     const languageLabel = LANGUAGES.find((option) => option.code === language)!.label;
     return (
+      <>
       <ScrollView style={styles.titleScreen} contentContainerStyle={styles.titleContainer}>
         <View style={styles.homeTopBar}>
           <TouchableOpacity
@@ -696,14 +715,14 @@ export default function OrbitBlocksApp() {
           )}
           <TouchableOpacity
             style={styles.goldMenuBtn}
-            onPress={() => startNewGame("CLASSIC")}
+            onPress={() => requestNewGame("CLASSIC")}
           >
             <Text style={styles.goldMenuBtnText}>▶ {t("playClassic")}</Text>
             <Text style={[styles.modeHint, { color: "#302009" }]}>{t("classicHint")}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.darkMenuBtn}
-            onPress={() => startNewGame("COMFORT")}
+            onPress={() => requestNewGame("COMFORT")}
           >
             <Text style={styles.darkMenuBtnText}>⚡ {t("playComfort")}</Text>
             <Text style={styles.modeHint}>{t("quickPlayHint")}</Text>
@@ -742,6 +761,14 @@ export default function OrbitBlocksApp() {
           </View>
         </View>
       </ScrollView>
+      <NewGameConfirmation
+        mode={pendingNewGameMode}
+        onCancel={cancelNewGame}
+        onConfirm={() => {
+          if (pendingNewGameMode !== null) startNewGame(pendingNewGameMode);
+        }}
+      />
+      </>
     );
   }
 
@@ -1176,7 +1203,7 @@ export default function OrbitBlocksApp() {
             ) : (
               <TouchableOpacity
                 style={styles.goldMenuBtn}
-                onPress={() => startNewGame(gameState.config.mode)}
+                onPress={() => requestNewGame(gameState.config.mode)}
               >
                 <Text style={styles.goldMenuBtnText}>🔄 {t("playAgain")}</Text>
               </TouchableOpacity>
