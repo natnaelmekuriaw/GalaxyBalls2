@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "dependencies": {
     "@expo/ui": "~58.0.23",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "^58.0.19",
     "expo-audio": "~58.0.10",
     "expo-constants": "~58.0.13",
@@ -35,6 +36,8 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "test": "node --experimental-strip-types --test tests/data.test.mjs tests/sounds.test.mjs tests/translations.test.mjs",
+    "test:data": "node --experimental-strip-types --test tests/data.test.mjs",
     "sounds:build": "node scripts/generate-sounds.cjs",
     "test:sounds": "node --experimental-strip-types --test tests/sounds.test.mjs",
     "start": "expo start",
