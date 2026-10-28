@@ -1,0 +1,111 @@
+import {
+  Tabs,
+  TabList,
+  TabTrigger,
+  TabSlot,
+  TabTriggerSlotProps,
+  TabListProps,
+} from 'expo-router/ui';
+import type { ComponentProps } from 'react';
+import { Image } from 'expo-image';
+import { Pressable, View, StyleSheet } from 'react-native';
+
+import { ThemedText } from './themed-text';
+import { ThemedView } from './themed-view';
+
+import { MaxContentWidth, Spacing } from '@/shared/theme';
+import { useLanguage } from '@/shared/i18n/LanguageProvider';
+
+export default function AppTabs() {
+  const { t } = useLanguage();
+  return (
+    <Tabs>
+      <TabSlot style={{ height: '100%' }} />
+      <TabList asChild>
+        <CustomTabList>
+          <TabTrigger name="home" href="/" asChild>
+            <TabButton>{t('home')}</TabButton>
+          </TabTrigger>
+          <TabTrigger name="explore" href="/explore" asChild>
+            <TabButton>{t('games')}</TabButton>
+          </TabTrigger>
+        </CustomTabList>
+      </TabList>
+    </Tabs>
+  );
+}
+
+type TabButtonProps = Omit<TabTriggerSlotProps, 'ref'> & Pick<ComponentProps<typeof Pressable>, 'ref'>;
+
+export function TabButton({ children, isFocused, ...props }: TabButtonProps) {
+  return (
+    <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
+      <ThemedView
+        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
+        style={styles.tabButtonView}>
+        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+          {children}
+        </ThemedText>
+      </ThemedView>
+    </Pressable>
+  );
+}
+
+export function CustomTabList(props: TabListProps) {
+  return (
+    <View {...props} pointerEvents="box-none" style={styles.tabListContainer}>
+      <ThemedView type="backgroundElement" style={styles.innerContainer}>
+        <Image
+          source={require('@/assets/branding/galaxy-balls-icon.png')}
+          style={styles.brandIcon}
+          accessible={false}
+        />
+        <ThemedText type="smallBold" style={styles.brandText}>
+          Galaxy Balls
+        </ThemedText>
+
+        {props.children}
+
+      </ThemedView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabListContainer: {
+    position: 'absolute',
+    width: '100%',
+    padding: Spacing.three,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  innerContainer: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.five,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    gap: Spacing.two,
+    maxWidth: MaxContentWidth,
+  },
+  brandText: {
+    marginRight: 'auto',
+    flexShrink: 1,
+  },
+  brandIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+  tabButtonView: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Spacing.three,
+  },
+});

@@ -36,11 +36,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "test:resume": "node --experimental-strip-types --test tests/resume.test.mjs",
-    "test:data": "node --experimental-strip-types --test tests/data.test.mjs",
-    "sounds:build": "node scripts/generate-sounds.cjs",
-    "test:sounds": "node --experimental-strip-types --test tests/sounds.test.mjs",
+    "test": "node --experimental-strip-types --test \"tests/**/*.test.mjs\"",
+    "test:galaxy-balls": "node --experimental-strip-types --test tests/games/galaxy-balls/*.test.mjs",
+    "test:resume": "node --experimental-strip-types --test tests/games/galaxy-balls/resume.test.mjs",
+    "test:data": "node --experimental-strip-types --test tests/app/data.test.mjs",
+    "sounds:build": "node scripts/games/galaxy-balls/generate-sounds.cjs",
+    "test:sounds": "node --experimental-strip-types --test tests/games/galaxy-balls/sounds.test.mjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",
