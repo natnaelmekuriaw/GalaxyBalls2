@@ -17,6 +17,75 @@ function memoryStorage(initial = null) {
 
 const entry = (score, level = 1) => ({ alias: 'YOU', score, level, date: '2026-10-26' });
 
+// A fixed version-one save, independent of current defaults and engine builders.
+const LEGACY_SAVE_V1 = `{
+  "version": 1,
+  "language": "am",
+  "soundsEnabled": false,
+  "menuMusicEnabled": false,
+  "hapticsEnabled": false,
+  "colorblindGlyphs": false,
+  "rotationMode": "GEOMETRY_90",
+  "highScores": {
+    "CLASSIC": [{"alias":"YOU","score":900,"level":6,"date":"2026-10-27"}],
+    "COMFORT": [{"alias":"YOU","score":1200,"level":7,"date":"2026-10-27"}],
+    "PRACTICE": []
+  },
+  "currentGame": {
+    "grid": [
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}],
+      [{"kind":"STONE"},{"kind":"NORMAL","colorId":1},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"},{"kind":"EMPTY"}]
+    ],
+    "activePiece": {"x":2,"y":3,"cells":[{"dx":0,"dy":0,"kind":"NORMAL","colorId":2},{"dx":0,"dy":1,"kind":"NORMAL","colorId":3}],"isSingleSpecial":false},
+    "nextPiece": {"x":2,"y":0,"cells":[{"dx":0,"dy":0,"kind":"STAR"}],"isSingleSpecial":true},
+    "score": 295,
+    "level": 2,
+    "piecesPlaced": 12,
+    "linesOrMatchesCleared": 9,
+    "lastChainDepth": 2,
+    "lastSpecialTriggered": "BOMB",
+    "mascotIndex": 1,
+    "mascotMood": "HAPPY",
+    "status": "PAUSED",
+    "config": {
+      "mode":"COMFORT","numColors":5,"initialFallMs":720,"minFallMs":240,
+      "speedDecayPerLevel":60,"threeBlockUnlockLevel":1,"experimentalFourBlockPieces":false,
+      "rotationMode":"COLOR_CYCLE","allowHardDrop":true,"showGhostPiece":true,
+      "bombRadius":1,"stoneChanceBase":0.07,"specialChanceBase":0.11,"maxConsecutiveHazards":2
+    },
+    "seed": -123456789,
+    "consecutiveHazards": 1
+  }
+}`;
+
+test('a fixed legacy save survives the shared-preference split and the next persisted update', async () => {
+  assert.equal(APP_DATA_KEY, '@galaxy-balls/game-data');
+  const legacy = JSON.parse(LEGACY_SAVE_V1);
+  assert.deepEqual(parseAppData(LEGACY_SAVE_V1), legacy);
+  const storage = memoryStorage(LEGACY_SAVE_V1);
+  const store = createAppDataStore(storage);
+  await store.load();
+  await store.flush();
+  assert.deepEqual(store.getSnapshot().data, legacy);
+  assert.equal(storage.calls.length, 0, 'Loading an existing save must not rewrite it');
+  store.setSoundsEnabled(true);
+  await store.flush();
+  const expected = { ...legacy, soundsEnabled: true };
+  assert.deepEqual(JSON.parse(storage.value), expected, 'Keep the original flat schema and all game fields');
+  const reopened = createAppDataStore(storage);
+  await reopened.load();
+  assert.deepEqual(reopened.getSnapshot().data, expected);
+  assert.equal(reopened.getSnapshot().data.currentGame.config.rotationMode, 'COLOR_CYCLE');
+});
+
 test('vibration, symbols and both rotation choices survive reopening without changing a saved game', async () => {
   for (const haptics of [false, true]) for (const glyphs of [false, true]) for (const rotation of ['GEOMETRY_90', 'COLOR_CYCLE']) {
     const storage = memoryStorage();
