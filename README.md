@@ -1,6 +1,14 @@
 # Welcome to Galaxy Balls Game 👋
 A mobile and web game built with React Native and Expo.
 
+## Project organization
+
+Game implementations live in `src/games/<game-id>/`; reusable app code lives in
+`src/shared/`. Routes select screens, and the Games collection renders a typed
+game registry. Galaxy Balls remains the only registered game. See the
+[architecture guide](docs/architecture.md) for folders, save compatibility, and
+the steps for adding another game.
+
 ## Game artwork
 
 The original block-and-orbit identity appears on the home screen, Games card,
