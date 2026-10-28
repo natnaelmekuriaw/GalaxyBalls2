@@ -1,6 +1,13 @@
 # Welcome to Galaxy Balls Game 👋
 A mobile and web game built with React Native and Expo.
 
+## Game artwork
+
+The original block-and-orbit identity appears on the home screen, Games card,
+app launcher, splash screen, web navigation, and favicon. Sources, palette, and
+asset usage are documented in [the artwork guide](assets/branding/README.md).
+Launcher and splash changes need a new native build to appear on an installed app.
+
 ## Languages
 
 Tap the language button on the home screen to open language settings, or open
