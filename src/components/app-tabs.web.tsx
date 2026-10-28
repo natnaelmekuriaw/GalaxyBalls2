@@ -7,6 +7,7 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import type { ComponentProps } from 'react';
+import { Image } from 'expo-image';
 import { Pressable, View, StyleSheet } from 'react-native';
 
 import { ThemedText } from './themed-text';
@@ -54,6 +55,11 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} pointerEvents="box-none" style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
+        <Image
+          source={require('@/assets/branding/galaxy-balls-icon.png')}
+          style={styles.brandIcon}
+          accessible={false}
+        />
         <ThemedText type="smallBold" style={styles.brandText}>
           Galaxy Balls
         </ThemedText>
@@ -76,23 +82,30 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
+    paddingHorizontal: Spacing.three,
     borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
-    flexGrow: 1,
+    flex: 1,
+    minWidth: 0,
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
   },
   brandText: {
     marginRight: 'auto',
+    flexShrink: 1,
+  },
+  brandIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
   },
   pressed: {
     opacity: 0.7,
   },
   tabButtonView: {
     paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.two,
     borderRadius: Spacing.three,
   },
 });

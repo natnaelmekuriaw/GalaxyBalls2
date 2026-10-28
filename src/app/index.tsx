@@ -1,5 +1,7 @@
 // src/app/(tabs)/index.tsx
 import { router, useFocusEffect, useNavigation } from "expo-router";
+import type { Metadata } from "expo-router/server";
+import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -48,6 +50,13 @@ import { GameControls } from "../components/game-controls";
 import { GameFeedback } from "../components/game-feedback";
 import { getResolutionFeedback, type ResolutionFeedback } from "../gameplay/feedback";
 import { ARENA_PADDING, getGameArenaLayout, MASCOT_HEIGHT, MASCOT_WIDTH } from "../utils/game-layout";
+
+export function generateMetadata(): Metadata {
+  return {
+    title: "Galaxy Balls",
+    description: "Match colorful blocks, trigger special clears, and chase your best score in Galaxy Balls.",
+  };
+}
 
 const NORMAL_BLOCKS = [
   {
@@ -678,11 +687,13 @@ export default function OrbitBlocksApp() {
           <Text style={styles.homeLanguageLabel}>›</Text>
         </TouchableOpacity>
         </View>
-        <View style={styles.logoStack}>
-          <Text style={styles.logoGalaxy}>Galaxy</Text>
-          <View style={styles.logoSwoosh} />
-          <Text style={styles.logoBalls}>Balls</Text>
-        </View>
+        <Image
+          source={require("@/assets/branding/galaxy-balls-title.png")}
+          style={styles.titleLogo}
+          contentFit="contain"
+          accessibilityLabel="Galaxy Balls"
+          accessible
+        />
         <View style={styles.titleCenterpiece}>
           <View style={styles.titlePlanetPurple} />
           <View style={styles.titlePlanetIce} />
@@ -1270,35 +1281,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     flexShrink: 1,
   },
-  logoStack: {
-    alignItems: "center",
+  titleLogo: {
+    width: "100%",
+    maxWidth: 330,
+    aspectRatio: 3,
     marginTop: 6,
-  },
-  logoGalaxy: {
-    color: "#FFFFFF",
-    fontSize: 44,
-    fontWeight: "900",
-    letterSpacing: 2,
-    textShadowColor: "#3B82F6",
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 8,
-  },
-  logoSwoosh: {
-    width: 140,
-    height: 6,
-    backgroundColor: "#60A5FA",
-    borderRadius: 4,
-    marginVertical: 2,
-  },
-  logoBalls: {
-    color: "#FFFFFF",
-    fontSize: 40,
-    fontWeight: "900",
-    letterSpacing: 3,
-    marginLeft: 36,
-    textShadowColor: "#2563EB",
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 8,
   },
   titleCenterpiece: {
     width: 260,

@@ -1,36 +1,36 @@
 {
   "expo": {
-    "name": "GalaxyBallsExpo",
+    "name": "Galaxy Balls",
     "slug": "GalaxyBallsExpo",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/branding/galaxy-balls-icon.png",
     "scheme": "galaxyballsexpo",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/branding/galaxy-balls-icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "backgroundColor": "#020518",
+        "foregroundImage": "./assets/branding/galaxy-balls-adaptive.png",
+        "monochromeImage": "./assets/branding/galaxy-balls-adaptive.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/branding/galaxy-balls-icon.png"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#020518",
+          "image": "./assets/branding/galaxy-balls-adaptive.png",
+          "imageWidth": 280,
+          "resizeMode": "contain"
         }
       ],
       [
