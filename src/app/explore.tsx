@@ -1,9 +1,18 @@
 import { router } from 'expo-router';
+import type { Metadata } from 'expo-router/server';
+import { Image } from 'expo-image';
 import { Platform, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GameText as Text } from '@/components/game-text';
 import { useLanguage } from '@/i18n/LanguageProvider';
+
+export function generateMetadata(): Metadata {
+  return {
+    title: 'Games | Galaxy Balls',
+    description: 'Play Galaxy Balls, a colorful space puzzle with matching blocks and special clears.',
+  };
+}
 
 export default function GamesScreen() {
   const { t } = useLanguage();
@@ -21,11 +30,12 @@ export default function GamesScreen() {
         <Text style={styles.intro}>{t('gamesHint')}</Text>
 
         <View style={styles.gameCard}>
-          <View style={styles.blocks} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-            <View style={[styles.block, { backgroundColor: '#1565C0' }]}><Text style={styles.symbol}>◆</Text></View>
-            <View style={[styles.block, { backgroundColor: '#2E9E28' }]}><Text style={styles.symbol}>●</Text></View>
-            <View style={[styles.block, { backgroundColor: '#D32F2F' }]}><Text style={styles.symbol}>★</Text></View>
-          </View>
+          <Image
+            source={require('@/assets/branding/galaxy-balls-icon.png')}
+            style={styles.gameIcon}
+            contentFit="contain"
+            accessible={false}
+          />
           <Text style={styles.badge}>{t('availableNow')}</Text>
           <Text style={styles.gameName}>Galaxy Balls</Text>
           <Text style={styles.description}>{t('galaxyBallsDescription')}</Text>
@@ -55,9 +65,7 @@ const styles = StyleSheet.create({
   heading: { color: '#FDE68A', fontSize: 24, fontWeight: '900', textAlign: 'center' },
   intro: { color: '#CBD5E1', fontSize: 15, lineHeight: 22, textAlign: 'center' },
   gameCard: { backgroundColor: '#0F172A', borderColor: '#475569', borderWidth: 1, borderRadius: 20, padding: 22, gap: 14 },
-  blocks: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 10 },
-  block: { width: 48, height: 48, borderRadius: 10, borderColor: '#FFFFFF66', borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  symbol: { color: '#FFFFFF', fontSize: 25 },
+  gameIcon: { width: 96, height: 96, borderRadius: 20, alignSelf: 'center' },
   badge: { color: '#A7F3D0', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   gameName: { color: '#FFFFFF', fontSize: 28, fontWeight: '900', textAlign: 'center' },
   description: { color: '#CBD5E1', fontSize: 15, lineHeight: 23, textAlign: 'center' },
