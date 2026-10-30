@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const { buildSnakeSounds } = require('../../../scripts/games/snake/generate-sounds.cjs');
-const cues = ['start', 'eat', 'turn', 'lose', 'win'];
+const cues = ['start', 'eat', 'turn', 'lose', 'win', 'bonus', 'level'];
 
 test('Snake sound assets match their deterministic generator and contain valid short PCM audio', () => {
   const sounds = buildSnakeSounds();

@@ -13,6 +13,8 @@ const motifs = {
   turn: [tone(330, 0.04, 0.1, 392)],
   lose: [tone(392, 0.08), tone(293.66, 0.1), tone(196, 0.17)],
   win: [tone(440, 0.07), tone(554.37, 0.07), tone(659.25, 0.09), tone(880, 0.18)],
+  bonus: [tone(1046.5, 0.04, 0.23), tone(1568, 0.05, 0.23), tone(2093, 0.08, 0.19)],
+  level: [tone(523.25, 0.04, 0.2), tone(659.25, 0.04, 0.2), tone(880, 0.06, 0.22)],
 };
 
 function synthesize(notes) {

@@ -1,12 +1,14 @@
-import { pauseSnake, restoreSnakeGame, SNAKE_COLS, SNAKE_ROWS, SNAKE_DIFFICULTIES, type SnakeDifficulty, type SnakeState } from '../engine/snakeEngine.ts';
+import { getSnakeMaxScore, pauseSnake, restoreSnakeGame, SNAKE_DIFFICULTIES, SNAKE_MODES, type SnakeDifficulty, type SnakeMode, type SnakeState } from '../engine/snakeEngine.ts';
 
 export const SNAKE_DATA_KEY = '@snake/game-data';
 
 export interface SnakeData {
   version: 1;
   bestScores: Record<SnakeDifficulty, number>;
+  arcadeBestScores: Record<SnakeDifficulty, number>;
   currentGame: SnakeState | null;
   lastDifficulty: SnakeDifficulty;
+  lastMode: SnakeMode;
 }
 
 export interface SnakeDataStorage {
@@ -15,7 +17,14 @@ export interface SnakeDataStorage {
 }
 
 export function createDefaultSnakeData(): SnakeData {
-  return { version: 1, bestScores: { EASY: 0, NORMAL: 0, FAST: 0 }, currentGame: null, lastDifficulty: 'NORMAL' };
+  return {
+    version: 1,
+    bestScores: { EASY: 0, NORMAL: 0, FAST: 0 },
+    arcadeBestScores: { EASY: 0, NORMAL: 0, FAST: 0 },
+    currentGame: null,
+    lastDifficulty: 'NORMAL',
+    lastMode: 'ARCADE',
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -26,10 +35,16 @@ function isDifficulty(value: unknown): value is SnakeDifficulty {
   return typeof value === 'string' && SNAKE_DIFFICULTIES.some((difficulty) => difficulty === value);
 }
 
-function isScore(value: unknown): value is number {
-  return typeof value === 'number' && Number.isSafeInteger(value)
-    && value >= 0 && value <= (SNAKE_COLS * SNAKE_ROWS - 4) * 10 && value % 10 === 0;
+function isMode(value: unknown): value is SnakeMode {
+  return typeof value === 'string' && SNAKE_MODES.some((mode) => mode === value);
 }
+
+function isScore(value: unknown, mode: SnakeMode): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value)
+    && value >= 0 && value <= getSnakeMaxScore(mode) && value % 10 === 0;
+}
+
+const scoresKey = (mode: SnakeMode) => mode === 'ARCADE' ? 'arcadeBestScores' : 'bestScores';
 
 function withBestScore(bestScores: SnakeData['bestScores'], difficulty: SnakeDifficulty, score: number) {
   return score > bestScores[difficulty] ? { ...bestScores, [difficulty]: score } : bestScores;
@@ -42,14 +57,22 @@ export function parseSnakeData(raw: string | null): SnakeData {
   try { saved = JSON.parse(raw); } catch { return data; }
   if (!isRecord(saved) || saved.version !== 1) return data;
   if (isDifficulty(saved.lastDifficulty)) data.lastDifficulty = saved.lastDifficulty;
-  if (isRecord(saved.bestScores)) {
-    for (const difficulty of SNAKE_DIFFICULTIES) {
-      const score = saved.bestScores[difficulty];
-      if (isScore(score)) data.bestScores[difficulty] = score;
+  for (const mode of SNAKE_MODES) {
+    const key = scoresKey(mode);
+    const scores = saved[key];
+    if (isRecord(scores)) {
+      for (const difficulty of SNAKE_DIFFICULTIES) {
+        const score = scores[difficulty];
+        if (isScore(score, mode)) data[key][difficulty] = score;
+      }
     }
   }
   data.currentGame = restoreSnakeGame(saved.currentGame);
-  if (data.currentGame) data.bestScores = withBestScore(data.bestScores, data.currentGame.difficulty, data.currentGame.score);
+  data.lastMode = isMode(saved.lastMode) ? saved.lastMode : data.currentGame?.mode ?? 'CLASSIC';
+  if (data.currentGame) {
+    const key = scoresKey(data.currentGame.mode);
+    data[key] = withBestScore(data[key], data.currentGame.difficulty, data.currentGame.score);
+  }
   return data;
 }
 
@@ -126,22 +149,32 @@ export function createSnakeDataStore(storage: SnakeDataStorage) {
         update({ ...snapshot.data, lastDifficulty: difficulty });
       }
     },
+    setMode(mode: SnakeMode) {
+      if (isMode(mode) && snapshot.data.lastMode !== mode) {
+        update({ ...snapshot.data, lastMode: mode });
+      }
+    },
     saveGame(state: SnakeState) {
       if (state.status !== 'PLAYING' && state.status !== 'PAUSED') return;
       const currentGame = restoreSnakeGame(pauseSnake(state));
       if (!currentGame) return;
+      const key = scoresKey(currentGame.mode);
       update({
         ...snapshot.data,
-        bestScores: withBestScore(snapshot.data.bestScores, currentGame.difficulty, currentGame.score),
+        [key]: withBestScore(snapshot.data[key], currentGame.difficulty, currentGame.score),
         currentGame,
         lastDifficulty: currentGame.difficulty,
+        lastMode: currentGame.mode,
       });
     },
     finishGame(state: SnakeState) {
-      if ((state.status !== 'GAME_OVER' && state.status !== 'WON') || !isDifficulty(state.difficulty) || !isScore(state.score)) return;
-      const bestScores = withBestScore(snapshot.data.bestScores, state.difficulty, state.score);
-      if (snapshot.data.currentGame === null && bestScores === snapshot.data.bestScores && snapshot.data.lastDifficulty === state.difficulty) return;
-      update({ ...snapshot.data, bestScores, currentGame: null, lastDifficulty: state.difficulty });
+      if ((state.status !== 'GAME_OVER' && state.status !== 'WON') || !isDifficulty(state.difficulty)
+        || !isMode(state.mode) || !isScore(state.score, state.mode)) return;
+      const key = scoresKey(state.mode);
+      const scores = withBestScore(snapshot.data[key], state.difficulty, state.score);
+      if (snapshot.data.currentGame === null && scores === snapshot.data[key]
+        && snapshot.data.lastDifficulty === state.difficulty && snapshot.data.lastMode === state.mode) return;
+      update({ ...snapshot.data, [key]: scores, currentGame: null, lastDifficulty: state.difficulty, lastMode: state.mode });
     },
     async flush() {
       await writes;

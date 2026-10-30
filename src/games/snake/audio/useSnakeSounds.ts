@@ -2,7 +2,7 @@ import { createAudioPlayer, setAudioModeAsync, type AudioSource } from 'expo-aud
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 
-export type SnakeSoundCue = 'start' | 'eat' | 'turn' | 'lose' | 'win';
+export type SnakeSoundCue = 'start' | 'eat' | 'turn' | 'lose' | 'win' | 'bonus' | 'level';
 
 const SOURCES: Record<SnakeSoundCue, AudioSource> = {
   start: require('@/assets/games/snake/sounds/start.wav'),
@@ -10,6 +10,8 @@ const SOURCES: Record<SnakeSoundCue, AudioSource> = {
   turn: require('@/assets/games/snake/sounds/turn.wav'),
   lose: require('@/assets/games/snake/sounds/lose.wav'),
   win: require('@/assets/games/snake/sounds/win.wav'),
+  bonus: require('@/assets/games/snake/sounds/bonus.wav'),
+  level: require('@/assets/games/snake/sounds/level.wav'),
 };
 
 type Player = ReturnType<typeof createAudioPlayer>;

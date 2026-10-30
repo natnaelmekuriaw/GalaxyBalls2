@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { createDefaultSnakeData, createSnakeDataStore, parseSnakeData, SNAKE_DATA_KEY } from '../../../src/games/snake/data/snakeDataStore.ts';
-import { createSnakeGame, SNAKE_DIFFICULTIES, SNAKE_COLS, SNAKE_ROWS } from '../../../src/games/snake/engine/snakeEngine.ts';
+import { createSnakeGame, getSnakeMaxScore, resumeSnake, stepSnake, SNAKE_DIFFICULTIES, SNAKE_COLS, SNAKE_ROWS } from '../../../src/games/snake/engine/snakeEngine.ts';
 
 function memoryStorage(initial = null) {
   let value = initial;
@@ -23,6 +23,14 @@ function playable(difficulty = 'NORMAL', score = 10) {
 }
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
+
+function arcadePlayable(difficulty = 'NORMAL', foods = 5) {
+  let state = resumeSnake(createSnakeGame(difficulty, 123456789, 'ARCADE'));
+  for (let index = 0; index < foods; index++) {
+    state = stepSnake({ ...state, food: { x: state.body[0].x + 1, y: state.body[0].y } });
+  }
+  return state;
+}
 
 test('Snake initializes without writes, hydrates once and only publishes to subscribed listeners', async () => {
   const storage = memoryStorage();
@@ -259,4 +267,94 @@ test('failed writes retry the latest checkpoint and selected pace when storage r
   assert.equal(reopened.getSnapshot().data.currentGame.difficulty, 'FAST');
   assert.equal(reopened.getSnapshot().data.lastDifficulty, 'EASY');
   assert.deepEqual(reopened.getSnapshot().data.bestScores, { EASY: 0, NORMAL: 10, FAST: 30 });
+});
+
+test('the original Snake document migrates as Classic with its run and records intact', async () => {
+  const current = playable('EASY', 20);
+  const legacyRun = Object.fromEntries(['body', 'direction', 'turnQueue', 'food', 'score', 'difficulty', 'status', 'seed']
+    .map(key => [key, clone(current[key])]));
+  const storage = memoryStorage(JSON.stringify({
+    version: 1, bestScores: { EASY: 40, NORMAL: 70, FAST: 30 }, currentGame: legacyRun, lastDifficulty: 'FAST',
+  }));
+  const store = createSnakeDataStore(storage);
+  await store.load();
+  const restored = store.getSnapshot().data;
+  assert.equal(restored.lastMode, 'CLASSIC');
+  assert.deepEqual(restored.bestScores, { EASY: 40, NORMAL: 70, FAST: 30 });
+  assert.deepEqual(restored.arcadeBestScores, { EASY: 0, NORMAL: 0, FAST: 0 });
+  assert.deepEqual(restored.currentGame.body, legacyRun.body);
+  assert.deepEqual(restored.currentGame.food, legacyRun.food);
+  assert.deepEqual(restored.currentGame.turnQueue, legacyRun.turnQueue);
+  assert.equal(restored.currentGame.mode, 'CLASSIC');
+  assert.equal(restored.currentGame.status, 'PAUSED');
+  assert.equal(storage.writes.length, 0, 'Loading a legacy run must not eagerly rewrite it');
+  store.setMode('ARCADE');
+  await store.flush();
+  const reopened = createSnakeDataStore(storage);
+  await reopened.load();
+  assert.deepEqual(reopened.getSnapshot().data.bestScores, restored.bestScores);
+  assert.equal(reopened.getSnapshot().data.currentGame.mode, 'CLASSIC');
+  assert.equal(reopened.getSnapshot().data.lastMode, 'ARCADE');
+});
+
+test('Arcade records stay independent from Classic and from other paces during play and after loss', async () => {
+  const storage = memoryStorage();
+  const store = createSnakeDataStore(storage);
+  await store.load();
+  assert.equal(store.getSnapshot().data.lastMode, 'ARCADE');
+  store.saveGame(playable('NORMAL', 40));
+  const normal = arcadePlayable('NORMAL', 5);
+  const easy = arcadePlayable('EASY', 4);
+  store.saveGame(normal);
+  store.finishGame({ ...normal, status: 'GAME_OVER', deathReason: 'wall' });
+  store.saveGame(easy);
+  store.finishGame({ ...easy, status: 'GAME_OVER', deathReason: 'rock' });
+  store.saveGame(arcadePlayable('FAST', 1));
+  await store.flush();
+  const reopened = createSnakeDataStore(storage);
+  await reopened.load();
+  assert.deepEqual(reopened.getSnapshot().data.bestScores, { EASY: 0, NORMAL: 40, FAST: 0 });
+  assert.deepEqual(reopened.getSnapshot().data.arcadeBestScores, { EASY: easy.score, NORMAL: normal.score, FAST: 10 });
+  assert.equal(reopened.getSnapshot().data.lastMode, 'ARCADE');
+  assert.equal(reopened.getSnapshot().data.currentGame.mode, 'ARCADE');
+  assert.equal(reopened.getSnapshot().data.currentGame.difficulty, 'FAST');
+});
+
+test('an Arcade checkpoint restores rocks, chain and gold lifetime exactly without ticking while paused', async () => {
+  const storage = memoryStorage();
+  const store = createSnakeDataStore(storage);
+  await store.load();
+  const state = arcadePlayable('NORMAL', 5);
+  assert.ok(state.bonus, 'Five fruit reveal the bonus');
+  assert.ok(state.comboTicks > 0);
+  assert.equal(state.combo, 3);
+  const expected = { ...clone(state), status: 'PAUSED' };
+  store.saveGame(state);
+  state.bonus.position.x = 0;
+  state.bonus.ticksLeft = 1;
+  state.rocks[0].x = 0;
+  await store.flush();
+  const reopened = createSnakeDataStore(storage);
+  await reopened.load();
+  const saved = reopened.getSnapshot().data.currentGame;
+  assert.deepEqual(saved, expected, 'Saved nested objects must not alias the live engine');
+  assert.equal(stepSnake(saved), saved, 'An unopened or paused save consumes no bonus or chain time');
+  assert.deepEqual(stepSnake(resumeSnake(saved)), stepSnake(resumeSnake(expected)), 'The exact seeded future survives reopening');
+});
+
+test('corrupt Arcade records fall back per field and cannot contaminate Classic records', async () => {
+  const data = parseSnakeData(JSON.stringify({
+    version: 1, bestScores: { EASY: 50, NORMAL: getSnakeMaxScore('ARCADE') },
+    arcadeBestScores: { EASY: getSnakeMaxScore('ARCADE'), NORMAL: 11, FAST: -10 }, lastMode: 'UNKNOWN',
+  }));
+  assert.deepEqual(data.bestScores, { EASY: 50, NORMAL: 0, FAST: 0 });
+  assert.deepEqual(data.arcadeBestScores, { EASY: getSnakeMaxScore('ARCADE'), NORMAL: 0, FAST: 0 });
+  assert.equal(data.lastMode, 'CLASSIC');
+  const storage = memoryStorage();
+  const store = createSnakeDataStore(storage);
+  await store.load();
+  store.setMode('UNKNOWN');
+  assert.equal(store.getSnapshot().data.lastMode, 'ARCADE');
+  store.finishGame({ ...arcadePlayable(), status: 'GAME_OVER', score: getSnakeMaxScore('ARCADE') + 10 });
+  assert.deepEqual(store.getSnapshot().data.arcadeBestScores, { EASY: 0, NORMAL: 0, FAST: 0 });
 });
