@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Vibration, View,
   useWindowDimensions,
@@ -36,19 +36,26 @@ function Action({ children, onPress, secondary = false }: { children: ReactNode;
   </Pressable>;
 }
 
+// Keep the closing card intact until the modal's fade finishes.
+const DialogPanel = memo(function DialogPanel({ title, children, footer }: {
+  visible: boolean; title: string; children: ReactNode; footer?: ReactNode;
+}) {
+  return <View accessibilityViewIsModal style={s.dialog}>
+    <ScrollView contentContainerStyle={s.dialogContent} bounces={false}>
+      <Text accessibilityRole="header" style={s.dialogTitle}>{title}</Text>
+      {children}
+    </ScrollView>
+    {footer && <View style={s.dialogFooter}>{footer}</View>}
+  </View>;
+}, (_previous, next) => !next.visible);
+
 function Dialog({ visible, title, onClose, children, dismissible = true, footer }: {
   visible: boolean; title: string; onClose: () => void; children: ReactNode; dismissible?: boolean; footer?: ReactNode;
 }) {
   return <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-    <View style={s.backdrop}>
+    <View pointerEvents={visible ? 'auto' : 'none'} style={s.backdrop}>
       {dismissible && <Pressable accessible={false} style={StyleSheet.absoluteFill} onPress={onClose} />}
-      <View accessibilityViewIsModal style={s.dialog}>
-        <ScrollView contentContainerStyle={s.dialogContent} bounces={false}>
-          <Text accessibilityRole="header" style={s.dialogTitle}>{title}</Text>
-          {children}
-        </ScrollView>
-        {footer && <View style={s.dialogFooter}>{footer}</View>}
-      </View>
+      <DialogPanel visible={visible} title={title} footer={footer}>{children}</DialogPanel>
     </View>
   </Modal>;
 }

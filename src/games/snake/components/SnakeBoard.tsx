@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import { Animated, PanResponder, Platform, StyleSheet, View } from 'react-native';
 
 import { getSwipeDirection } from '../controls/input';
-import { SNAKE_COLS, SNAKE_ROWS, type Direction, type Point, type SnakeState } from '../engine/snakeEngine';
+import { SNAKE_BONUS_TICKS, SNAKE_COLS, SNAKE_ROWS, type Direction, type Point, type SnakeState } from '../engine/snakeEngine';
 import { C } from '../theme';
 
 const BODY_COLORS = ['#B8F779', '#A5E974', '#8FDB79', '#75CC7B', '#5CBA7A'];
@@ -139,7 +139,7 @@ export function SnakeBoard({ state, size, label, onDirection, enabled, children,
       {state.food && <View testID="snake-food" style={[styles.artCell, { left: state.food.x * cell, top: state.food.y * cell, width: cell, height: cell }]}><GardenFruit cell={cell} /></View>}
       {bonus && <View testID="snake-bonus" style={[styles.artCell, { left: bonus.position.x * cell, top: bonus.position.y * cell, width: cell, height: cell }]}>
         <GardenFruit cell={cell} golden />
-        <View style={[styles.bonusTrack, { top: cell * 0.96, width: cell * 0.9, left: cell * 0.05 }]}><View style={[styles.bonusLife, { width: `${bonus.ticksLeft * 2}%` }]} /></View>
+        <View style={[styles.bonusTrack, { top: cell * 0.96, width: cell * 0.9, left: cell * 0.05 }]}><View style={[styles.bonusLife, { width: `${bonus.ticksLeft / SNAKE_BONUS_TICKS * 100}%` }]} /></View>
       </View>}
       <SnakeTrail body={state.body} direction={state.direction} cell={cell} testHead />
       {feedback && !reducedMotion && <Animated.View pointerEvents="none" style={[styles.bloom, {
