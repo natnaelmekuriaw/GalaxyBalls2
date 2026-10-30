@@ -2,7 +2,7 @@
   <img src="assets/branding/galaxy-balls-title.png" width="360" alt="Galaxy Balls" />
 </p>
 
-<p align="center">A Nokia-inspired block puzzle for mobile and web.</p>
+<p align="center">Galaxy Balls and Snake — two arcade classics for mobile and web.</p>
 
 <p align="center">
   <a href="#how-to-play">How to play</a> ·
@@ -13,6 +13,8 @@
 
 ## How to play
 
+**Galaxy Balls**
+
 Match colors, trigger cascades, and keep the board from filling up.
 
 | Mode | Falling speed | Landing guide | Instant drop |
@@ -21,6 +23,11 @@ Match colors, trigger cascades, and keep the board from filling up.
 | **Quick Play** | Faster | ✓ | ✓ |
 
 Hold **◀ ▼ ▶** to move. Tap **↻** to rotate; **⇓** drops instantly in Quick Play.
+
+**Snake** — explore the night garden in Classic or Arcade. Collect fruit, build
+score chains, and catch golden bonuses while avoiding rocks and your trail.
+Choose Easy, Normal, or Fast; steer with arrows, swipes, or keyboard.
+[Controls & saves →](docs/snake.md)
 
 - **Languages:** English · አማርኛ · Afaan Oromoo
 - **Audio:** menu music and effects, with separate controls
@@ -34,6 +41,7 @@ Click a screenshot to open it full size.
 <p align="center">
   <a href="docs/images/home.jpg"><img src="docs/images/home.jpg" width="220" alt="Home menu with language selection and Resume Game" /></a>
   <a href="docs/images/gameplay.jpg"><img src="docs/images/gameplay.jpg" width="220" alt="Galaxy Balls board, next-piece preview, cascade feedback, and movement controls" /></a>
+  <a href="docs/images/snake.jpg"><img src="docs/images/snake.jpg" width="220" alt="Snake night-garden menu with Classic and Arcade modes, pace selection, and a saved run" /></a>
 </p>
 
 ## Run locally
@@ -48,8 +56,9 @@ For mobile development, run `npm start`.
 <details>
 <summary><strong>What gets saved?</strong></summary>
 
-Your current game, top-five scores, language, and settings stay on this device.
-Reopen the app and choose **Resume Game** to continue.
+Each game keeps its own unfinished run and scores on this device. Galaxy Balls
+keeps a top-five table; Snake keeps a best score for each garden and speed. Language and
+audio settings are shared. Reopen a game and choose **Resume** to continue.
 
 Starting another run asks before replacing a saved game. Clearing app or browser
 data removes local saves.
@@ -66,7 +75,8 @@ npm test
 ```
 
 - Game-only tests: `npm run test:galaxy-balls`
-- Rebuild sounds: `npm run sounds:build`
+- Snake tests: `npm run test:snake`
+- Rebuild sounds: `npm run sounds:build` / `npm run sounds:snake`
 - Launcher icons and splash changes need a new native build.
 
 [Project structure & adding games](docs/architecture.md) · [Artwork](assets/branding/README.md) · [Font license](assets/fonts/OFL.txt)

@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useNavigation } from "expo-router";
+import { router, useFocusEffect, useIsFocused, useNavigation } from "expo-router";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -225,6 +225,7 @@ function snapshotEngineState(state: EngineState): EngineState {
 }
 
 export default function GalaxyBallsScreen() {
+  const isFocused = useIsFocused();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -266,8 +267,8 @@ export default function GalaxyBallsScreen() {
   const pieceTranslateY = useMemo(() => Animated.multiply(animY, cellSize), [animY, cellSize]);
   const [mascotJumpAnim] = useState(() => new Animated.Value(0));
 
-  const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled);
-  const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME");
+  const { play: playSound, playSequence: playSoundSequence, stop: stopSounds } = useGameSounds(soundsEnabled && isFocused);
+  const menuMusic = useMenuMusic(soundsEnabled && menuMusicEnabled && screen !== "GAME" && isFocused);
   const highContrast = false;
   const experimental4Block = false;
 

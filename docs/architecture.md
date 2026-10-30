@@ -1,8 +1,7 @@
 # Project structure
 
-The app contains a game library and independent game modules. Galaxy Balls is the
-only registered game today. Adding another game should not require editing its
-engine, controls, save parser, or screen.
+The game library launches Galaxy Balls and Snake. Each game owns its rules,
+controls, sounds, and saved runs.
 
 ```text
 src/
@@ -23,6 +22,14 @@ src/
       gameplay/              Match and level feedback
       layout/                Board and arena sizing
       data/                  Game save validation, score ranking, and data context
+    snake/
+      SnakeScreen.tsx        Menu, countdown, gameplay, and pause lifecycle
+      engine/                Pure movement, collisions, food, and save validation
+      components/            Responsive board and right-side direction pad
+      controls/              Swipe and keyboard direction mapping
+      audio/                 Game sound lifecycle
+      i18n/                  Game text in all three shared languages
+      data/                  Independent save store and route-scoped provider
   shared/
     components/              Text, themed UI, tabs, and startup splash
     hooks/                   Shared color scheme and theme hooks
@@ -35,11 +42,14 @@ assets/
   branding/                  App identity and current home artwork
   fonts/                     Shared offline fonts and license
   games/galaxy-balls/sounds/  Galaxy Balls sound pack
+  games/snake/               Snake icon and sound pack
 scripts/games/galaxy-balls/   Sound generator
+scripts/games/snake/          Snake sound generator
 tests/
   app/                       App persistence and legacy save compatibility
   shared/                    Shared translations
   games/galaxy-balls/         Engine, controls, feedback, layout, audio, and resume
+  games/snake/                Engine, input, persistence, sound assets, and text
 ```
 
 ## Boundaries
@@ -68,6 +78,12 @@ this folder refactor requires no storage migration. The app composition store is
 the compatibility boundary for that existing document. Never create a second
 writer for the same key.
 
+Snake uses `@snake/game-data` with its own version-1 parser and provider, mounted
+by `src/app/games/snake.tsx`. It stores the selected garden and speed, separate
+Classic and Arcade score tables, and a paused checkpoint including chain and
+golden-fruit timers. Older Classic saves migrate in memory without a startup
+write. It never writes the Galaxy Balls document.
+
 New games should use their own namespaced keys and game-specific parsers and
 contexts. They should consume the shared preference context rather than copy
 language or sound settings into their own saves. Finishing a game must update
@@ -83,7 +99,7 @@ its score and checkpoint together.
    image reference, and translated description and launch label. The collection
    renders the registry; it does not import game screens or engines. Update the
    collection introduction when more games become available.
-4. Compose any new game data provider at the app level as needed. Keep its save
+4. Compose a game data provider in its route when possible. Keep its save
    schema separate from other games and preserve existing stored data.
 5. Run the full test suite, lint, TypeScript, and platform bundling, then verify
    navigation and resume behavior in the app before merging.

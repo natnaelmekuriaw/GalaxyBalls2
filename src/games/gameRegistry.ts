@@ -21,4 +21,12 @@ export const GAME_REGISTRY = [
     descriptionKey: 'galaxyBallsDescription',
     openLabelKey: 'openGalaxyBalls',
   },
+  {
+    id: 'snake',
+    title: 'Snake',
+    href: '/games/snake',
+    icon: require('@/assets/games/snake/icon.png'),
+    descriptionKey: 'snakeDescription',
+    openLabelKey: 'openSnake',
+  },
 ] as const satisfies readonly GameDefinition[];
