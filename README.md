@@ -24,8 +24,9 @@ Match colors, trigger cascades, and keep the board from filling up.
 
 Hold **◀ ▼ ▶** to move. Tap **↻** to rotate; **⇓** drops instantly in Quick Play.
 
-**Snake** — open **Other Games**, eat the gold food, and avoid walls and your tail.
-Choose Easy, Normal, or Fast; steer with the right-side arrows, swipes, or keyboard.
+**Snake** — explore the night garden in Classic or Arcade. Collect fruit, build
+score chains, and catch golden bonuses while avoiding rocks and your trail.
+Choose Easy, Normal, or Fast; steer with arrows, swipes, or keyboard.
 [Controls & saves →](docs/snake.md)
 
 - **Languages:** English · አማርኛ · Afaan Oromoo
@@ -40,7 +41,7 @@ Click a screenshot to open it full size.
 <p align="center">
   <a href="docs/images/home.jpg"><img src="docs/images/home.jpg" width="220" alt="Home menu with language selection and Resume Game" /></a>
   <a href="docs/images/gameplay.jpg"><img src="docs/images/gameplay.jpg" width="220" alt="Galaxy Balls board, next-piece preview, cascade feedback, and movement controls" /></a>
-  <a href="docs/images/snake.jpg"><img src="docs/images/snake.jpg" width="220" alt="Snake menu with three speeds and a saved run" /></a>
+  <a href="docs/images/snake.jpg"><img src="docs/images/snake.jpg" width="220" alt="Snake night-garden menu with Classic and Arcade modes, pace selection, and a saved run" /></a>
 </p>
 
 ## Run locally
@@ -56,7 +57,7 @@ For mobile development, run `npm start`.
 <summary><strong>What gets saved?</strong></summary>
 
 Each game keeps its own unfinished run and scores on this device. Galaxy Balls
-keeps a top-five table; Snake keeps a best score for each speed. Language and
+keeps a top-five table; Snake keeps a best score for each garden and speed. Language and
 audio settings are shared. Reopen a game and choose **Resume** to continue.
 
 Starting another run asks before replacing a saved game. Clearing app or browser

@@ -79,8 +79,10 @@ the compatibility boundary for that existing document. Never create a second
 writer for the same key.
 
 Snake uses `@snake/game-data` with its own version-1 parser and provider, mounted
-by `src/app/games/snake.tsx`. It stores the selected speed, a best score for each
-speed, and a paused checkpoint. It never writes the Galaxy Balls document.
+by `src/app/games/snake.tsx`. It stores the selected garden and speed, separate
+Classic and Arcade score tables, and a paused checkpoint including chain and
+golden-fruit timers. Older Classic saves migrate in memory without a startup
+write. It never writes the Galaxy Balls document.
 
 New games should use their own namespaced keys and game-specific parsers and
 contexts. They should consume the shared preference context rather than copy

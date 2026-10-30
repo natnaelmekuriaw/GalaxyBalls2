@@ -4,7 +4,7 @@ import SnakeScreen from '@/games/snake/SnakeScreen';
 import { SnakeDataProvider } from '@/games/snake/data/SnakeDataProvider';
 
 export function generateMetadata(): Metadata {
-  return { title: 'Snake | Galaxy Balls', description: 'Eat, grow, and beat your best score in classic Snake.' };
+  return { title: 'Snake | Galaxy Balls', description: 'Classic and Arcade Snake in a night garden, with fruit chains and golden bonuses.' };
 }
 
 export default function SnakeRoute() {
