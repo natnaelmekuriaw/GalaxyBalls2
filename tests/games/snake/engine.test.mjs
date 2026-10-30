@@ -148,10 +148,10 @@ test('all paces accelerate after each five foods and stop at a playable minimum 
   for (const [difficulty, initial] of [['EASY', 220], ['NORMAL', 160], ['FAST', 110]]) {
     const state = createSnakeGame(difficulty, 42);
     assert.equal(getSnakeTickMs(state), initial);
-    assert.equal(getSnakeTickMs({ ...state, score: 40 }), initial);
-    assert.equal(getSnakeTickMs({ ...state, score: 50 }), initial - 12);
-    assert.equal(getSnakeTickMs({ ...state, score: 100 }), initial - 24);
-    assert.equal(getSnakeTickMs({ ...state, score: 3200 }), 65);
+    assert.equal(getSnakeTickMs({ ...state, body: Array(8).fill(state.body[0]), score: 40 }), initial);
+    assert.equal(getSnakeTickMs({ ...state, body: Array(9).fill(state.body[0]), score: 50 }), initial - 12);
+    assert.equal(getSnakeTickMs({ ...state, body: Array(14).fill(state.body[0]), score: 100 }), initial - 24);
+    assert.equal(getSnakeTickMs({ ...state, body: Array(324).fill(state.body[0]), score: 3200 }), 65);
   }
   assert.deepEqual(SNAKE_DIFFICULTIES, ['EASY', 'NORMAL', 'FAST']);
 });
