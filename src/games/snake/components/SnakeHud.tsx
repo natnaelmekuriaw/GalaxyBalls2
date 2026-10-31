@@ -21,8 +21,11 @@ export function SnakeHud({ game, best, compact, tr }: {
       <Text style={s.level}>{tr('level')} {getSnakeLevel(game)}</Text>
       <View style={s.levelDots}>{[0, 1, 2, 3, 4].map(index => <View key={index} style={[s.levelDot, index < foods % 5 && s.levelDotFilled]} />)}</View>
       <Text style={s.nextLevel}>{tr('levelProgress', { count: foods % 5 })}</Text>
+      {compact && game.mode === 'ARCADE' && <Text style={[s.compactChain, game.bonus && { color: C.gold }]}>
+        {game.bonus ? '✦ +50' : `${Math.max(1, game.combo)}×`}
+      </Text>}
     </View>
-    {game.mode === 'ARCADE' && <View style={s.arcadeRow}>
+    {game.mode === 'ARCADE' && !compact && <View style={s.arcadeRow}>
       <View style={[s.chain, compact && { paddingVertical: 5 }, game.combo > 1 && s.chainActive]}>
         <Text style={[s.chainText, game.combo > 0 && { color: C.mint }]}>{tr('chainLabel', { count: Math.max(1, game.combo) })}</Text>
         <View style={s.timerTrack}><View style={[s.timerFill, { width: `${game.comboTicks / SNAKE_COMBO_TICKS * 100}%` }]} /></View>
@@ -52,6 +55,7 @@ const s = StyleSheet.create({
   levelDot: { flex: 1, height: 3, backgroundColor: C.line, borderRadius: 2 },
   levelDotFilled: { backgroundColor: C.teal },
   nextLevel: { color: C.muted, fontSize: 10 },
+  compactChain: { color: C.mint, fontSize: 10, fontWeight: '800' },
   arcadeRow: { flexDirection: 'row', gap: 8 },
   chain: { width: '37%', paddingHorizontal: 10, paddingVertical: 8, backgroundColor: C.panel, borderRadius: 12, gap: 5, borderWidth: 1, borderColor: C.line },
   chainActive: { borderColor: '#587541', backgroundColor: '#1D392C' },
