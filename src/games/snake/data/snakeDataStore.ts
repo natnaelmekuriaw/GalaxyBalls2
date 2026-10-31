@@ -1,4 +1,5 @@
 import { getSnakeMaxScore, pauseSnake, restoreSnakeGame, SNAKE_DIFFICULTIES, SNAKE_MODES, type SnakeDifficulty, type SnakeMode, type SnakeState } from '../engine/snakeEngine.ts';
+import { createDefaultControlSettings, parseControlSettings, type SnakeControlSettings } from '../controls/settings.ts';
 
 export const SNAKE_DATA_KEY = '@snake/game-data';
 
@@ -9,6 +10,7 @@ export interface SnakeData {
   currentGame: SnakeState | null;
   lastDifficulty: SnakeDifficulty;
   lastMode: SnakeMode;
+  controls: SnakeControlSettings;
 }
 
 export interface SnakeDataStorage {
@@ -24,6 +26,7 @@ export function createDefaultSnakeData(): SnakeData {
     currentGame: null,
     lastDifficulty: 'NORMAL',
     lastMode: 'ARCADE',
+    controls: createDefaultControlSettings(),
   };
 }
 
@@ -56,6 +59,7 @@ export function parseSnakeData(raw: string | null): SnakeData {
   let saved: unknown;
   try { saved = JSON.parse(raw); } catch { return data; }
   if (!isRecord(saved) || saved.version !== 1) return data;
+  data.controls = parseControlSettings(saved.controls);
   if (isDifficulty(saved.lastDifficulty)) data.lastDifficulty = saved.lastDifficulty;
   for (const mode of SNAKE_MODES) {
     const key = scoresKey(mode);
@@ -152,6 +156,14 @@ export function createSnakeDataStore(storage: SnakeDataStorage) {
     setMode(mode: SnakeMode) {
       if (isMode(mode) && snapshot.data.lastMode !== mode) {
         update({ ...snapshot.data, lastMode: mode });
+      }
+    },
+    setControls(patch: Partial<SnakeControlSettings>) {
+      const previous = snapshot.data.controls;
+      const controls = parseControlSettings(patch, previous);
+      if (controls.style !== previous.style || controls.size !== previous.size || controls.locked !== previous.locked
+        || controls.position.x !== previous.position.x || controls.position.y !== previous.position.y) {
+        update({ ...snapshot.data, controls });
       }
     },
     saveGame(state: SnakeState) {

@@ -27,6 +27,7 @@ Hold **◀ ▼ ▶** to move. Tap **↻** to rotate; **⇓** drops instantly in 
 **Snake** — explore the night garden in Classic or Arcade. Collect fruit, build
 score chains, and catch golden bonuses while avoiding rocks and your trail.
 Choose Easy, Normal, or Fast; steer with arrows, swipes, or keyboard.
+Switch to an analog stick, enlarge the buttons, or move and lock the pad in **Controls**.
 [Controls & saves →](docs/snake.md)
 
 - **Languages:** English · አማርኛ · Afaan Oromoo

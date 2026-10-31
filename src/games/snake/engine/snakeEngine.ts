@@ -74,9 +74,14 @@ export function createSnakeGame(
   };
 }
 
-/** Buffer two real turns, each relative to the previous queued heading. */
+/** Keep the next turn, while allowing the player to correct the following turn. */
 export function queueDirection(state: SnakeState, direction: Direction): SnakeState {
-  if (state.status !== 'PLAYING' || state.turnQueue.length >= 2) return state;
+  if (state.status !== 'PLAYING') return state;
+  if (state.turnQueue.length >= 2) {
+    const first = state.turnQueue[0];
+    if (direction === OPPOSITE[first] || direction === state.turnQueue[1]) return state;
+    return { ...state, turnQueue: direction === first ? [first] : [first, direction] };
+  }
   const previous = state.turnQueue.at(-1) ?? state.direction;
   if (direction === previous || direction === OPPOSITE[previous]) return state;
   return { ...state, turnQueue: [...state.turnQueue, direction] };
