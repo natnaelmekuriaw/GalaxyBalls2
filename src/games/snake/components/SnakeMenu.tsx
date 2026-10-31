@@ -10,11 +10,12 @@ type Tr = (key: SnakeTranslationKey, values?: Record<string, string | number>) =
 export const paceKey: Record<SnakeDifficulty, SnakeTranslationKey> = { EASY: 'easy', NORMAL: 'normal', FAST: 'fast' };
 export const modeKey: Record<SnakeMode, SnakeTranslationKey> = { CLASSIC: 'classic', ARCADE: 'arcade' };
 
-export function SnakeMenu({ mode, pace, best, currentGame, rulesOpen, reducedMotion, compact, tr, onMode, onPace, onResume, onNew, onRules }: {
+export function SnakeMenu({ mode, pace, best, currentGame, rulesOpen, reducedMotion, compact, tr, onMode, onPace, onResume, onNew, onRules, onControls, controlSummary }: {
   mode: SnakeMode; pace: SnakeDifficulty; best: number; currentGame: SnakeState | null;
   rulesOpen: boolean; reducedMotion: boolean; compact: boolean; tr: Tr;
   onMode: (mode: SnakeMode) => void; onPace: (pace: SnakeDifficulty) => void;
   onResume: () => void; onNew: () => void; onRules: () => void;
+  onControls: () => void; controlSummary: string;
 }) {
   return <ScrollView style={s.scroll} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
     <View style={s.menu}>
@@ -53,6 +54,9 @@ export function SnakeMenu({ mode, pace, best, currentGame, rulesOpen, reducedMot
           </Pressable>)}
         </View>
       </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={tr('customizeControls')} onPress={onControls} style={s.controlsRow}>
+        <Text style={s.controlsLabel}>⚙ {tr('controls')}</Text><Text style={s.controlsSummary}>{controlSummary} ›</Text>
+      </Pressable>
       {currentGame ? <>
         <Pressable accessibilityRole="button" onPress={onResume} style={({ pressed }) => [s.play, pressed && s.pressed]}>
           <View style={s.playCopy}><Text style={s.playText}>{tr('resumeRun', { mode: tr(modeKey[currentGame.mode]) })}</Text>
@@ -112,6 +116,9 @@ const s = StyleSheet.create({
   speedDots: { flexDirection: 'row', gap: 3 },
   speedDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.line },
   paceText: { color: C.muted, fontSize: 12, fontWeight: '800' },
+  controlsRow: { minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: C.line, paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  controlsLabel: { color: C.teal, fontSize: 12, fontWeight: '800' },
+  controlsSummary: { color: C.muted, fontSize: 11, flexShrink: 1, textAlign: 'right' },
   play: { backgroundColor: C.mint, minHeight: 58, borderRadius: 19, paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   playCopy: { flex: 1, gap: 4 },
   playText: { color: C.bg, fontSize: 19, fontWeight: '900', flexShrink: 1 },
