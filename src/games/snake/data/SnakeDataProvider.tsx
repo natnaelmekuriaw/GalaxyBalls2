@@ -4,7 +4,7 @@ import { ActivityIndicator, AppState, StyleSheet, View } from 'react-native';
 
 import { createSnakeDataStore, type SnakeData, type SnakeDataStore } from './snakeDataStore';
 
-type SnakeDataContextValue = SnakeData & Pick<SnakeDataStore, 'setDifficulty' | 'setMode' | 'saveGame' | 'finishGame' | 'flush'> & { saveFailed: boolean };
+type SnakeDataContextValue = SnakeData & Pick<SnakeDataStore, 'setDifficulty' | 'setMode' | 'setControls' | 'saveGame' | 'finishGame' | 'flush'> & { saveFailed: boolean };
 
 const SnakeDataContext = createContext<SnakeDataContextValue | null>(null);
 
@@ -28,6 +28,7 @@ export function SnakeDataProvider({ children }: PropsWithChildren) {
     saveFailed: snapshot.saveFailed,
     setDifficulty: store.setDifficulty,
     setMode: store.setMode,
+    setControls: store.setControls,
     saveGame: store.saveGame,
     finishGame: store.finishGame,
     flush: store.flush,
