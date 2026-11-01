@@ -19,7 +19,7 @@ import { SnakeHud } from './components/SnakeHud';
 import { SnakeMenu, modeKey } from './components/SnakeMenu';
 import { createSnakeCountdown } from './controls/countdown';
 import { getDirectionForKey } from './controls/input';
-import { getControlHeightBudget, getControlMetrics, type ControlPosition } from './controls/layout';
+import { getControlHeightBudget, getControlMetrics, getControlOffset, type ControlPosition } from './controls/layout';
 import { CONTROL_SIZE_LABELS } from './controls/settings';
 import { queueControlDirection } from './controls/turnIntent';
 import { useSnakeData } from './data/SnakeDataProvider';
@@ -96,6 +96,7 @@ export default function SnakeScreen() {
   const [languageOpen, setLanguageOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(true);
   const resumeAfterTools = useRef(false);
   const [orientationOpen, setOrientationOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
@@ -111,11 +112,16 @@ export default function SnakeScreen() {
   const feedbackId = useRef(0);
   const tr = (key: SnakeTranslationKey, values?: Record<string, string | number>) => translateSnake(language, key, values);
   const terminal = game.status === 'GAME_OVER' || game.status === 'WON';
-  const boardSize = Math.max(0, Math.floor(Math.min(arena.width - 8, arena.height - 8, 560)));
+  const boardSize = Math.max(0, Math.floor(Math.min(arena.width - 8, arena.height - 8, 720)));
   const gameBest = (game.mode === 'ARCADE' ? arcadeBestScores : bestScores)[game.difficulty];
   const menuBest = (mode === 'ARCADE' ? arcadeBestScores : bestScores)[pace];
   const foods = game.body.length - 4;
   const controlMetrics = getControlMetrics(controls, compactControls, getControlHeightBudget(playBounds, compactControls, landscape));
+  const controlOffset = getControlOffset(controls.position, playBounds, controlMetrics);
+  const freeLeft = Math.max(0, controlOffset.x - 8);
+  const freeRight = Math.max(0, playBounds.width - controlOffset.x - controlMetrics.width - 8);
+  const shortcutsOnRight = freeRight > freeLeft;
+  const shortcutsWidth = Math.min(108, Math.max(freeLeft, freeRight));
   const controlSummary = tr('controlSummary', { style: tr(controls.style === 'ANALOG' ? 'analog' : 'buttons'), size: tr(CONTROL_SIZE_LABELS[controls.size]) });
 
   const apply = useCallback((next: SnakeState) => {
@@ -442,6 +448,24 @@ export default function SnakeScreen() {
           enabled={!arranging && (game.status === 'PLAYING' || countdown !== null) && isFocused}
           onDirection={turn} label={direction => tr(directionKey[direction])} onPositionChange={updateControlPosition}
           onLock={finishArranging} moveLabel={tr('dragControls')} lockLabel={tr('finishEditing')} />}
+        {!arranging && shortcutsWidth >= 44 && <View testID="snake-control-shortcuts"
+          style={[s.shortcuts, { width: shortcutsWidth }, shortcutsOnRight ? { right: 0 } : { left: 0 }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={tr(shortcutsOpen ? 'hideShortcuts' : 'showShortcuts')}
+            accessibilityState={{ expanded: shortcutsOpen }} onPress={() => setShortcutsOpen(open => !open)} style={s.shortcutButton}>
+            <Text style={s.shortcutGlyph}>{shortcutsOpen ? '×' : '⋯'}</Text>
+          </Pressable>
+          {shortcutsOpen && <>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('customizeControls')} onPress={openControls} style={s.shortcutButton}>
+              <Text style={s.shortcutGlyph}>⚙</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('moveControls')} onPress={arrangeControls} style={s.shortcutButton}>
+              <Text style={s.shortcutGlyph}>✥</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={tr('menu')} onPress={returnToMenu} style={s.shortcutButton}>
+              <Text style={s.shortcutGlyph}>‹</Text>
+            </Pressable>
+          </>}
+        </View>}
       </View>
       {arranging && !compact && <Text style={s.gameHint}>{tr('dragControls')}</Text>}
     </>}
@@ -509,8 +533,12 @@ const s = StyleSheet.create({
   soundIcon: { color: C.mint, fontSize: 23, fontWeight: '700' },
   pauseButton: { backgroundColor: C.mint, borderColor: C.mint },
   pauseIcon: { color: C.bg, fontSize: 19, fontWeight: '900' },
-  playArea: { flex: 1, width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 8 },
+  playArea: { flex: 1, alignSelf: 'stretch', marginHorizontal: -14, maxWidth: 1000, gap: 8 },
   arena: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 0, minWidth: 0 },
+  shortcuts: { position: 'absolute', bottom: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' },
+  shortcutButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.panelRaised, borderWidth: 1,
+    borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
+  shortcutGlyph: { color: C.teal, fontSize: 24, fontWeight: '700' },
   toolsActive: { borderColor: C.teal },
   toolsGlyph: { color: C.cream, fontSize: 24, fontWeight: '700' },
   toolsLayer: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20 },
