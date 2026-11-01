@@ -10,59 +10,65 @@ export function SnakeHud({ game, best, compact, tr }: {
   tr: (key: SnakeTranslationKey, values?: Record<string, string | number>) => string;
 }) {
   const foods = game.body.length - 4;
-  return <View style={[s.hud, compact && { gap: 5 }]}>
-    <View style={s.scoreRow}>
-      <View style={s.score}><Text style={s.label}>{tr('score')}</Text><Text testID="snake-score" style={[s.scoreValue, compact && { fontSize: 28, lineHeight: 34 }]}>{game.score.toLocaleString()}</Text></View>
-      <View style={s.miniStat}><Text style={s.bestLabel}>★ {tr('best')}</Text><Text style={s.bestValue}>{best.toLocaleString()}</Text></View>
-      <View style={s.statDivider} />
-      <View style={s.miniStat}><Text style={s.label}>{tr('foods')}</Text><Text style={s.foodValue}>{foods}</Text></View>
+  const score = game.score.toLocaleString();
+  const bestScore = best.toLocaleString();
+  const chain = Math.max(1, game.combo);
+  return <View testID="snake-hud" style={[s.hud, compact && s.compactHud]}>
+    <View style={[s.scoreRow, compact && s.compactScoreRow]}>
+      <Text accessibilityLabel={`${tr('score')} ${score}`} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}
+        style={[s.score, compact && s.compactScore]}>
+        {!compact && <Text style={s.statLabel}>{tr('score')} </Text>}<Text testID="snake-score">{score}</Text>
+      </Text>
+      <Text accessibilityLabel={`${tr('best')} ${bestScore}`} numberOfLines={1} style={s.best}>
+        <Text style={s.bestStar}>★ </Text>{bestScore}
+      </Text>
+      <Text accessibilityLabel={`${tr('foods')} ${foods}`} numberOfLines={1} style={s.fruit}>
+        <Text style={compact ? s.berry : s.statLabel}>{compact ? '● ' : `${tr('foods')} `}</Text>{foods}
+      </Text>
     </View>
-    <View style={s.progressRow}>
-      <Text style={s.level}>{tr('level')} {getSnakeLevel(game)}</Text>
-      <View style={s.levelDots}>{[0, 1, 2, 3, 4].map(index => <View key={index} style={[s.levelDot, index < foods % 5 && s.levelDotFilled]} />)}</View>
+    <View style={[s.progressRow, compact && s.compactProgressRow]}>
+      <Text numberOfLines={1} style={s.level}>{tr('level')} {getSnakeLevel(game)}</Text>
+      <View accessible={false} style={[s.levelDots, compact && s.compactLevelDots]}>
+        {[0, 1, 2, 3, 4].map(index => <View key={index} style={[s.levelDot, index < foods % 5 && s.levelDotFilled]} />)}
+      </View>
       <Text style={s.nextLevel}>{tr('levelProgress', { count: foods % 5 })}</Text>
-      {compact && game.mode === 'ARCADE' && <Text style={[s.compactChain, game.bonus && { color: C.gold }]}>
-        {game.bonus ? '✦ +50' : `${Math.max(1, game.combo)}×`}
-      </Text>}
-    </View>
-    {game.mode === 'ARCADE' && !compact && <View style={s.arcadeRow}>
-      <View style={[s.chain, compact && { paddingVertical: 5 }, game.combo > 1 && s.chainActive]}>
-        <Text style={[s.chainText, game.combo > 0 && { color: C.mint }]}>{tr('chainLabel', { count: Math.max(1, game.combo) })}</Text>
+      {game.mode === 'ARCADE' && <View accessible accessibilityLabel={tr('chainLabel', { count: chain })} style={s.chain}>
+        <Text style={[s.chainText, game.combo > 1 && s.activeChain]}>{chain}×</Text>
         <View style={s.timerTrack}><View style={[s.timerFill, { width: `${game.comboTicks / SNAKE_COMBO_TICKS * 100}%` }]} /></View>
-      </View>
-      <View style={[s.gold, compact && { paddingVertical: 5 }, !!game.bonus && s.goldActive]}>
-        <Text numberOfLines={1} style={[s.goldText, !!game.bonus && { color: C.gold }]}>✦ {game.bonus ? `${tr('goldenFruit')} +50` : tr('nextLevel')}</Text>
-        {game.bonus && <View style={s.timerTrack}><View style={[s.timerFill, { backgroundColor: C.gold, width: `${game.bonus.ticksLeft / SNAKE_BONUS_TICKS * 100}%` }]} /></View>}
-      </View>
-    </View>}
+      </View>}
+      {game.bonus && <View accessible accessibilityLabel={tr('goldenHint')} style={s.gold}>
+        <Text style={s.goldText}>✦ +50</Text>
+        <View style={s.timerTrack}><View style={[s.timerFill, { backgroundColor: C.gold, width: `${game.bonus.ticksLeft / SNAKE_BONUS_TICKS * 100}%` }]} /></View>
+      </View>}
+    </View>
   </View>;
 }
 
 const s = StyleSheet.create({
-  hud: { width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 10, marginBottom: 6 },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 4 },
-  score: { flex: 1 },
-  label: { color: C.muted, fontSize: 11, fontWeight: '600' },
-  scoreValue: { color: C.cream, fontSize: 38, lineHeight: 44, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  miniStat: { alignItems: 'flex-end', gap: 4, maxWidth: '32%' },
-  bestLabel: { color: C.gold, fontSize: 11, fontWeight: '700' },
-  bestValue: { color: C.cream, fontSize: 19, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  foodValue: { color: C.coral, fontSize: 19, fontWeight: '800' },
-  statDivider: { height: 30, width: 1, backgroundColor: C.line },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 4 },
-  level: { color: C.teal, fontSize: 11, fontWeight: '800' },
-  levelDots: { flex: 1, flexDirection: 'row', gap: 4 },
+  hud: { width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 4, marginBottom: 4, paddingHorizontal: 4 },
+  compactHud: { gap: 2, marginBottom: 2 },
+  scoreRow: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  compactScoreRow: { height: 24, gap: 8 },
+  score: { flex: 1, minWidth: 0, color: C.cream, fontSize: 24, lineHeight: 28, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  compactScore: { fontSize: 22, lineHeight: 24 },
+  best: { maxWidth: '30%', color: C.cream, fontSize: 14, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  bestStar: { color: C.gold, fontSize: 11 },
+  fruit: { maxWidth: '30%', color: C.coral, fontSize: 14, lineHeight: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  berry: { color: C.coral, fontSize: 9 },
+  statLabel: { color: C.muted, fontSize: 10, fontWeight: '600' },
+  progressRow: { height: 18, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  compactProgressRow: { height: 16, gap: 4 },
+  level: { flexShrink: 0, color: C.teal, fontSize: 10, lineHeight: 14, fontWeight: '800' },
+  levelDots: { flex: 1, minWidth: 24, flexDirection: 'row', gap: 3 },
+  compactLevelDots: { minWidth: 12, gap: 1 },
   levelDot: { flex: 1, height: 3, backgroundColor: C.line, borderRadius: 2 },
   levelDotFilled: { backgroundColor: C.teal },
-  nextLevel: { color: C.muted, fontSize: 10 },
-  compactChain: { color: C.mint, fontSize: 10, fontWeight: '800' },
-  arcadeRow: { flexDirection: 'row', gap: 8 },
-  chain: { width: '37%', paddingHorizontal: 10, paddingVertical: 8, backgroundColor: C.panel, borderRadius: 12, gap: 5, borderWidth: 1, borderColor: C.line },
-  chainActive: { borderColor: '#587541', backgroundColor: '#1D392C' },
-  chainText: { color: C.muted, fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
+  nextLevel: { color: C.muted, fontSize: 9, lineHeight: 14 },
+  chain: { width: 21, height: 16, justifyContent: 'center', gap: 1 },
+  chainText: { color: C.muted, fontSize: 10, lineHeight: 12, textAlign: 'center', fontWeight: '800' },
+  activeChain: { color: C.mint },
   timerTrack: { height: 2, borderRadius: 1, backgroundColor: C.line, overflow: 'hidden' },
   timerFill: { height: '100%', backgroundColor: C.mint, borderRadius: 1 },
-  gold: { flex: 1, justifyContent: 'center', backgroundColor: C.panel, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, gap: 5, borderWidth: 1, borderColor: C.line },
-  goldActive: { borderColor: '#887347' },
-  goldText: { color: C.muted, fontSize: 10, fontWeight: '700' },
+  gold: { width: 38, height: 16, justifyContent: 'center', gap: 1 },
+  goldText: { color: C.gold, fontSize: 9, lineHeight: 12, textAlign: 'center', fontWeight: '800' },
 });

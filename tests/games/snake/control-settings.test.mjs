@@ -17,9 +17,9 @@ function memoryStorage(initial = null) {
   };
 }
 
-test('new control defaults are large, locked buttons with independent bottom-right positions', () => {
+test('new control defaults are small, locked buttons with independent bottom-right positions', () => {
   const first = createDefaultControlSettings();
-  assert.deepEqual(first, { style: 'BUTTONS', size: 'LARGE', locked: true, position: { x: 1, y: 1 } });
+  assert.deepEqual(first, { style: 'BUTTONS', size: 'SMALL', locked: true, position: { x: 1, y: 1 } });
   first.position.x = 0;
   first.style = 'ANALOG';
   assert.deepEqual(createDefaultSnakeData().controls, createDefaultControlSettings());
@@ -44,7 +44,7 @@ test('control parsing preserves valid fields and coordinates independently witho
 test('missing and malformed control data use safe defaults without discarding a valid run or records', () => {
   const currentGame = createSnakeGame('FAST', 51, 'ARCADE');
   for (const controls of [undefined, null, [], 'analog', false, 4,
-    { style: 'joystick', size: 'SMALL', locked: 'false', position: [] }]) {
+    { style: 'joystick', size: 'TINY', locked: 'false', position: [] }]) {
     const data = parseSnakeData(JSON.stringify({
       version: 1, currentGame, lastMode: 'ARCADE', lastDifficulty: 'FAST',
       bestScores: { EASY: 70, NORMAL: 20, FAST: 30 }, arcadeBestScores: { EASY: 90, NORMAL: 10, FAST: 100 }, controls,
@@ -79,7 +79,7 @@ test('older Classic saves gain controls in memory while keeping their exact run 
 });
 
 test('each style, size and lock choice survives reopening together with a checkpoint', async () => {
-  for (const style of ['BUTTONS', 'ANALOG']) for (const size of ['LARGE', 'EXTRA_LARGE']) for (const locked of [false, true]) {
+  for (const style of ['BUTTONS', 'ANALOG']) for (const size of ['SMALL', 'LARGE', 'EXTRA_LARGE']) for (const locked of [false, true]) {
     const storage = memoryStorage();
     const store = createSnakeDataStore(storage);
     await store.load();

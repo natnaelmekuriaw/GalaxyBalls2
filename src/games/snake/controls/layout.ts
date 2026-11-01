@@ -14,8 +14,8 @@ export function getControlHeightBudget(bounds: ControlBounds, compact: boolean, 
 }
 
 export function getControlMetrics(settings: Pick<SnakeControlSettings, 'style' | 'size'>, compact = false, availableHeight?: number): ControlMetrics {
-  const buttonSize = settings.size === 'EXTRA_LARGE' ? 76 : 64;
-  const nominalDiameter = settings.size === 'EXTRA_LARGE' ? 208 : 176;
+  const buttonSize = { SMALL: 52, LARGE: 64, EXTRA_LARGE: 76 }[settings.size];
+  const nominalDiameter = { SMALL: 144, LARGE: 176, EXTRA_LARGE: 208 }[settings.size];
   const diameter = typeof availableHeight === 'number' && Number.isFinite(availableHeight) && availableHeight > 0
     ? Math.max(128, Math.min(nominalDiameter, Math.floor(availableHeight - 44))) : nominalDiameter;
   const width = settings.style === 'ANALOG' ? diameter : buttonSize * 3 + 16;

@@ -11,14 +11,16 @@ import { LANGUAGES } from '@/shared/i18n/translations';
 import { useLanguage } from '@/shared/i18n/LanguageProvider';
 import { useAppPreferences } from '@/shared/preferences/AppPreferencesContext';
 import { useSnakeSounds } from './audio/useSnakeSounds';
-import { SnakeBoard } from './components/SnakeBoard';
+import { SnakeBoard, type SnakeBoardFeedback } from './components/SnakeBoard';
 import { FloatingSnakeControls } from './components/FloatingSnakeControls';
 import { SnakeControlSettings } from './components/SnakeControlSettings';
+import { SnakeOrientationSettings } from './components/SnakeOrientationSettings';
 import { SnakeHud } from './components/SnakeHud';
 import { SnakeMenu, modeKey } from './components/SnakeMenu';
 import { createSnakeCountdown } from './controls/countdown';
 import { getDirectionForKey } from './controls/input';
-import { getControlHeightBudget, getControlMetrics, getControlOffset, type ControlPosition } from './controls/layout';
+import { getControlHeightBudget, getControlMetrics, type ControlPosition } from './controls/layout';
+import { CONTROL_SIZE_LABELS } from './controls/settings';
 import { queueControlDirection } from './controls/turnIntent';
 import { useSnakeData } from './data/SnakeDataProvider';
 import {
@@ -26,12 +28,13 @@ import {
   stepSnake, type Direction, type SnakeState,
 } from './engine/snakeEngine';
 import { useReducedMotion } from './hooks/useReducedMotion';
+import { useSnakeOrientation } from './hooks/useSnakeOrientation';
 import { translateSnake, type SnakeTranslationKey } from './i18n/translations';
 import { C } from './theme';
+import { getSnakePickupReward } from './presentation/reward';
 
 const directionKey: Record<Direction, SnakeTranslationKey> = { UP: 'up', DOWN: 'down', LEFT: 'left', RIGHT: 'right' };
-const directionGlyph: Record<Direction, string> = { UP: '↑', DOWN: '↓', LEFT: '←', RIGHT: '→' };
-type Feedback = { id: number; kind: 'food' | 'bonus' | 'level'; points: number };
+type Feedback = SnakeBoardFeedback;
 
 function Action({ children, onPress, secondary = false }: { children: ReactNode; onPress: () => void; secondary?: boolean }) {
   return <Pressable accessibilityRole="button" onPress={onPress}
@@ -70,12 +73,16 @@ export default function SnakeScreen() {
   const { currentGame, bestScores, arcadeBestScores, lastDifficulty, lastMode, saveFailed, controls,
     saveGame, finishGame, setDifficulty, setMode: persistMode, setControls, flush } = useSnakeData();
   const isFocused = useIsFocused();
+  const focusedRef = useRef(isFocused);
+  const focusGeneration = useRef(0);
+  const orientation = useSnakeOrientation(isFocused);
   const { play, stop } = useSnakeSounds(soundsEnabled && isFocused);
   const reducedMotion = useReducedMotion();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
-  const landscape = width > height && height < 650;
+  const landscape = width > height;
   const compact = height < 650;
+  const compactControls = width < 600 || compact;
   const [game, setGame] = useState(() => currentGame ?? createSnakeGame(lastDifficulty, Date.now(), lastMode));
   const stateRef = useRef(game);
   const [inGame, setInGame] = useState(false);
@@ -88,6 +95,9 @@ export default function SnakeScreen() {
   const [pendingNew, setPendingNew] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [controlsOpen, setControlsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const resumeAfterTools = useRef(false);
+  const [orientationOpen, setOrientationOpen] = useState(false);
   const [arranging, setArranging] = useState(false);
   const arrangingRef = useRef(false);
   const previewOnly = useRef(false);
@@ -97,6 +107,7 @@ export default function SnakeScreen() {
   const [playBounds, setPlayBounds] = useState({ width: 0, height: 0 });
   const [recordBeforeRun, setRecordBeforeRun] = useState(0);
   const [feedback, setFeedback] = useState<Feedback | undefined>();
+  const [levelFeedback, setLevelFeedback] = useState<Feedback | undefined>();
   const feedbackId = useRef(0);
   const tr = (key: SnakeTranslationKey, values?: Record<string, string | number>) => translateSnake(language, key, values);
   const terminal = game.status === 'GAME_OVER' || game.status === 'WON';
@@ -104,13 +115,8 @@ export default function SnakeScreen() {
   const gameBest = (game.mode === 'ARCADE' ? arcadeBestScores : bestScores)[game.difficulty];
   const menuBest = (mode === 'ARCADE' ? arcadeBestScores : bestScores)[pace];
   const foods = game.body.length - 4;
-  const controlMetrics = getControlMetrics(controls, compact, getControlHeightBudget(playBounds, compact, landscape));
-  const controlOffset = getControlOffset(controls.position, playBounds, controlMetrics);
-  const freeLeft = Math.max(0, controlOffset.x - 12);
-  const freeRight = Math.max(0, playBounds.width - controlOffset.x - controlMetrics.width - 12);
-  const actionsOnRight = freeRight > freeLeft;
-  const actionsWidth = Math.min(112, Math.max(freeLeft, freeRight));
-  const controlSummary = tr('controlSummary', { style: tr(controls.style === 'ANALOG' ? 'analog' : 'buttons'), size: tr(controls.size === 'EXTRA_LARGE' ? 'extraLarge' : 'large') });
+  const controlMetrics = getControlMetrics(controls, compactControls, getControlHeightBudget(playBounds, compactControls, landscape));
+  const controlSummary = tr('controlSummary', { style: tr(controls.style === 'ANALOG' ? 'analog' : 'buttons'), size: tr(CONTROL_SIZE_LABELS[controls.size]) });
 
   const apply = useCallback((next: SnakeState) => {
     stateRef.current = next;
@@ -121,6 +127,8 @@ export default function SnakeScreen() {
 
   const pause = useCallback(() => {
     countdownClock.cancel();
+    setFeedback(undefined);
+    setLevelFeedback(undefined);
     countdownActive.current = false;
     setCountdown(null);
     setControlGeneration(value => value + 1);
@@ -129,17 +137,28 @@ export default function SnakeScreen() {
     void flush();
   }, [apply, flush, stop, countdownClock]);
 
+  const previousLandscape = useRef(landscape);
+  useEffect(() => {
+    if (previousLandscape.current === landscape) return;
+    previousLandscape.current = landscape;
+    pause();
+    setToolsOpen(false);
+  }, [landscape, pause]);
+
   const beginCountdown = useCallback((snapshot: SnakeState) => {
     if (AppState.currentState !== null && AppState.currentState !== 'active') return;
     inGameRef.current = true;
     previewOnly.current = false;
     arrangingRef.current = false;
     setArranging(false);
+    setToolsOpen(false);
+    setOrientationOpen(false);
     setControls({ locked: true });
     setInGame(true);
     setPace(snapshot.difficulty);
     setMode(snapshot.mode);
     setFeedback(undefined);
+    setLevelFeedback(undefined);
     apply(pauseSnake(snapshot));
     countdownActive.current = true;
     countdownClock.start(setCountdown, () => {
@@ -174,9 +193,24 @@ export default function SnakeScreen() {
       setInGame(false);
     }
   }, [setControls]);
-  const openControls = () => { pause(); setControlsOpen(true); };
+  const openControls = () => { pause(); setToolsOpen(false); setControlsOpen(true); };
+  const closeTools = () => {
+    setToolsOpen(false);
+    if (resumeAfterTools.current) {
+      resumeAfterTools.current = false;
+      beginCountdown(stateRef.current);
+    }
+  };
+  const rotateGame = async () => {
+    pause();
+    setToolsOpen(false);
+    const generation = focusGeneration.current;
+    const changed = await orientation.changeOrientation(landscape ? 'PORTRAIT' : 'LANDSCAPE');
+    if (!changed && focusedRef.current && generation === focusGeneration.current) setOrientationOpen(true);
+  };
   const arrangeControls = () => {
     pause();
+    setToolsOpen(false);
     if (!inGameRef.current) {
       previewOnly.current = true;
       const snapshot = currentGame ?? createSnakeGame(pace, Date.now(), mode);
@@ -192,6 +226,7 @@ export default function SnakeScreen() {
 
   const returnToMenu = () => {
     pause();
+    setToolsOpen(false);
     inGameRef.current = false;
     previewOnly.current = false;
     arrangingRef.current = false;
@@ -227,16 +262,18 @@ export default function SnakeScreen() {
       const next = stepSnake(previous);
       if (next === previous) return;
       apply(next);
+      const reward = getSnakePickupReward(previous, next);
       if (next.status === 'GAME_OVER' || next.status === 'WON') {
         stop();
         play(next.status === 'WON' ? 'win' : 'lose');
+        reward?.sounds.forEach(cue => play(cue));
         if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(next.status === 'WON' ? 70 : 120);
-      } else if (next.score > previous.score) {
-        const bonus = next.bonusCollected > previous.bonusCollected;
-        const level = getSnakeLevel(next) > getSnakeLevel(previous);
-        setFeedback({ id: ++feedbackId.current, kind: bonus ? 'bonus' : level ? 'level' : 'food', points: next.score - previous.score });
-        play(bonus ? 'bonus' : level ? 'level' : 'eat');
-        if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(bonus ? 35 : 12);
+      } else if (reward) {
+        const pickup = { id: ++feedbackId.current, kind: reward.kind, points: reward.points, position: reward.position };
+        setFeedback(pickup);
+        if (reward.kind === 'level') setLevelFeedback(pickup);
+        reward.sounds.forEach(cue => play(cue));
+        if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(reward.kind === 'food' ? 12 : 35);
       }
     }, tickMs);
     return () => clearInterval(timer);
@@ -248,7 +285,23 @@ export default function SnakeScreen() {
     return () => clearTimeout(timer);
   }, [feedback]);
 
-  useFocusEffect(useCallback(() => () => pause(), [pause]));
+  useEffect(() => {
+    if (!levelFeedback) return;
+    const timer = setTimeout(() => setLevelFeedback(undefined), 1400);
+    return () => clearTimeout(timer);
+  }, [levelFeedback]);
+
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    focusGeneration.current++;
+    return () => {
+      focusedRef.current = false;
+      focusGeneration.current++;
+      setToolsOpen(false);
+      setOrientationOpen(false);
+      pause();
+    };
+  }, [pause]));
   useEffect(() => {
     const change = AppState.addEventListener('change', next => { if (next !== 'active') pause(); });
     const blur = Platform.OS === 'android' ? AppState.addEventListener('blur', pause) : null;
@@ -272,7 +325,7 @@ export default function SnakeScreen() {
   }, [pause, countdownClock]);
 
   useEffect(() => {
-    if (Platform.OS !== 'web' || !inGame || !isFocused || languageOpen || pendingNew || controlsOpen) return;
+    if (Platform.OS !== 'web' || !inGame || !isFocused || languageOpen || pendingNew || controlsOpen || toolsOpen || orientationOpen) return;
     const keydown = (event: KeyboardEvent) => {
       if (!inGameRef.current && !arrangingRef.current) return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -302,10 +355,10 @@ export default function SnakeScreen() {
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
-  }, [inGame, isFocused, languageOpen, pendingNew, controlsOpen, countdown, turn, pause, beginCountdown,
+  }, [inGame, isFocused, languageOpen, pendingNew, controlsOpen, toolsOpen, orientationOpen, countdown, turn, pause, beginCountdown,
     controls.position.x, controls.position.y, finishArranging, updateControlPosition]);
 
-  const showRunDialog = inGame && !arranging && !controlsOpen && countdown === null && game.status !== 'PLAYING' && !languageOpen && isFocused;
+  const showRunDialog = inGame && !arranging && !controlsOpen && !toolsOpen && !orientationOpen && countdown === null && game.status !== 'PLAYING' && !languageOpen && isFocused;
   const outcomeKey = game.status === 'WON' ? 'won' : terminal ? 'gameOver' : 'paused';
   const deathKey = game.deathReason === 'rock' ? 'rockHit' : game.deathReason === 'body' ? 'bodyHit' : 'wallHit';
   const runActions = showRunDialog ? <>
@@ -324,18 +377,30 @@ export default function SnakeScreen() {
     paddingLeft: insets.left + 14, paddingRight: insets.right + 14,
   }]}>
     <View style={s.header}>
-      <Pressable accessibilityRole="button" accessibilityLabel={tr('backToGames')} onPress={leave} style={s.iconButton}>
+      {!inGame && <Pressable accessibilityRole="button" accessibilityLabel={tr('backToGames')} onPress={leave} style={s.iconButton}>
         <Text style={s.backIcon}>‹</Text>
-      </Pressable>
-      <View style={s.brand}><View style={s.brandSeed} /><Text style={s.brandText}>{tr('title')}</Text></View>
-      <Pressable accessibilityRole="button" accessibilityLabel={arranging ? tr('resetPosition') : `${sharedText('language')}: ${LANGUAGES.find(item => item.code === language)?.label}`}
+      </Pressable>}
+      {inGame ? <View style={s.headerHud}><SnakeHud game={game} best={gameBest} compact={compact || width < 600} tr={tr} /></View>
+        : <View style={s.brand}><View style={s.brandSeed} /><Text style={s.brandText}>{tr('title')}</Text></View>}
+      {(!inGame || arranging) && <Pressable accessibilityRole="button" accessibilityLabel={arranging ? tr('resetPosition') : `${sharedText('language')}: ${LANGUAGES.find(item => item.code === language)?.label}`}
         onPress={() => { if (arranging) updateControlPosition({ x: 1, y: 1 }); else { pause(); setLanguageOpen(true); } }} style={s.iconButton}>
         <Text style={[s.languageCode, arranging && { fontSize: 23 }]}>{arranging ? '↺' : language === 'am' ? 'አማ' : language.toUpperCase()}</Text>
-      </Pressable>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: soundsEnabled }} accessibilityLabel={tr(soundsEnabled ? 'soundOn' : 'soundOff')}
+      </Pressable>}
+      {!inGame && <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: soundsEnabled }} accessibilityLabel={tr(soundsEnabled ? 'soundOn' : 'soundOff')}
         onPress={() => setSoundsEnabled(!soundsEnabled)} style={s.iconButton}>
         <Text style={[s.soundIcon, !soundsEnabled && { color: C.muted }]}>{soundsEnabled ? '♫' : '♪'}</Text>
-      </Pressable>
+      </Pressable>}
+      {inGame && !arranging && <Pressable accessibilityRole="button" accessibilityLabel={tr(toolsOpen ? 'hideTools' : 'showTools')}
+        accessibilityState={{ expanded: toolsOpen }} onPress={() => {
+          if (toolsOpen) closeTools();
+          else {
+            resumeAfterTools.current = stateRef.current.status === 'PLAYING' || countdownActive.current;
+            pause();
+            setToolsOpen(true);
+          }
+        }} style={[s.iconButton, toolsOpen && s.toolsActive]}>
+        <Text style={s.toolsGlyph}>{toolsOpen ? '×' : '☰'}</Text>
+      </Pressable>}
       {inGame && (!terminal || arranging) && <Pressable accessibilityRole="button" accessibilityLabel={tr(arranging ? 'finishEditing' : game.status === 'PLAYING' || countdown !== null ? 'pause' : 'continue')}
         onPress={() => arranging ? finishArranging() : game.status === 'PLAYING' || countdown !== null ? pause() : beginCountdown(stateRef.current)} style={[s.iconButton, s.pauseButton]}>
         <Text style={s.pauseIcon}>{arranging ? '✓' : game.status === 'PLAYING' || countdown !== null ? 'Ⅱ' : '▶'}</Text>
@@ -346,7 +411,6 @@ export default function SnakeScreen() {
       reducedMotion={reducedMotion} tr={tr} rulesOpen={rulesOpen}
       onMode={value => { setMode(value); persistMode(value); }} onPace={value => { setPace(value); setDifficulty(value); }}
       onResume={resumeSaved} onNew={requestNew} onRules={() => setRulesOpen(!rulesOpen)} onControls={openControls} controlSummary={controlSummary} /> : <>
-      <SnakeHud game={game} best={gameBest} compact={compact} tr={tr} />
       <View style={s.playArea} onLayout={event => {
         const { width: measuredWidth, height: measuredHeight } = event.nativeEvent.layout;
         setPlayBounds(previous => previous.width === measuredWidth && previous.height === measuredHeight ? previous : { width: measuredWidth, height: measuredHeight });
@@ -359,53 +423,61 @@ export default function SnakeScreen() {
           setArena(previous => previous.width === measuredWidth && previous.height === measuredHeight ? previous : { width: measuredWidth, height: measuredHeight });
         }}>
           {boardSize > 0 && <SnakeBoard state={game} size={boardSize} enabled={!arranging && (game.status === 'PLAYING' || countdown !== null) && isFocused}
-            onDirection={turn} reducedMotion={reducedMotion} feedback={feedback}
+            onDirection={turn} reducedMotion={reducedMotion} feedback={feedback} levelFeedback={levelFeedback}
             label={tr('boardLabel', { mode: tr(modeKey[game.mode]), score: game.score, foods, level: getSnakeLevel(game) })}>
             {countdown !== null && <View pointerEvents="none" style={s.countdownOverlay}>
               <Text style={s.ready}>{tr('ready')}</Text>
               <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={s.countdown}>{countdown}</Text>
             </View>}
           </SnakeBoard>}
-          {feedback && game.status === 'PLAYING' && <View pointerEvents="none" style={s.feedback}>
-            <Text accessibilityLiveRegion="polite" style={[s.feedbackText, feedback.kind === 'bonus' && { color: C.gold }]}>
-              {feedback.kind === 'level' ? tr('levelUp', { level: getSnakeLevel(game) }) : tr('bonusPoints', { points: feedback.points })}
+          {(levelFeedback || feedback) && game.status === 'PLAYING' && <View pointerEvents="none" style={[s.feedback, !!levelFeedback && s.levelFeedback]}>
+            <Text accessibilityLiveRegion="polite" style={[s.feedbackText, !levelFeedback && feedback?.kind === 'bonus' && { color: C.gold }]}>
+              {levelFeedback ? `✦ ${tr('levelUp', { level: getSnakeLevel(game) })}` : tr('bonusPoints', { points: feedback?.points ?? 0 })}
             </Text>
           </View>}
         </View>
-        {!arranging && actionsWidth >= 48 && <View style={[s.quickActions, { width: actionsWidth }, actionsOnRight ? { right: 0 } : { left: 0 }]}>
-          {!compact && <><Text style={s.modeBadge}>{tr(modeKey[game.mode])}</Text>
-            <Text accessibilityLabel={tr('steering')} style={s.steering}>{(game.turnQueue.length ? game.turnQueue : [game.direction]).map(value => directionGlyph[value]).join(' › ')}</Text></>}
-          <View style={[s.controlTools, { flexDirection: actionsWidth >= 96 ? 'row' : 'column' }]}>
-            <Pressable accessibilityRole="button" accessibilityLabel={tr('customizeControls')} onPress={openControls} style={s.controlTool}><Text style={s.controlToolGlyph}>⚙</Text></Pressable>
-            {actionsWidth >= 96 && <Pressable accessibilityRole="button" accessibilityLabel={tr('unlockControls')} onPress={arrangeControls} style={s.controlTool}><Text style={s.controlToolGlyph}>✥</Text></Pressable>}
-          </View>
-          <Pressable accessibilityRole="button" onPress={returnToMenu} style={[s.menuButton, { minWidth: 44, width: '100%' }]}>
-            <Text style={s.menuButtonText}>‹ {tr('menu')}</Text>
-          </Pressable>
-        </View>}
         {playBounds.width > 0 && playBounds.height > 0 && <FloatingSnakeControls
           key={`${controls.style}-${controls.size}-${controls.locked}-${controlGeneration}`}
-          settings={controls} bounds={playBounds} compact={compact} landscape={landscape} editing={arranging && isFocused}
+          settings={controls} bounds={playBounds} compact={compactControls} landscape={landscape} editing={arranging && isFocused}
           enabled={!arranging && (game.status === 'PLAYING' || countdown !== null) && isFocused}
           onDirection={turn} label={direction => tr(directionKey[direction])} onPositionChange={updateControlPosition}
           onLock={finishArranging} moveLabel={tr('dragControls')} lockLabel={tr('finishEditing')} />}
       </View>
-      {!compact && <Text style={s.gameHint}>{arranging ? tr('dragControls') : Platform.OS === 'web' ? tr('keyboardHint') : tr('swipeHint')}</Text>}
+      {arranging && !compact && <Text style={s.gameHint}>{tr('dragControls')}</Text>}
     </>}
     {saveFailed && <Text accessibilityRole="alert" style={s.saveError}>{tr('saveFailed')}</Text>}
 
-    <Dialog visible={showRunDialog || pendingNew || languageOpen || controlsOpen}
-      title={languageOpen ? sharedText('language') : controlsOpen ? tr('customizeControls') : pendingNew ? tr('replaceTitle') : tr(outcomeKey)}
-      onClose={() => languageOpen ? setLanguageOpen(false) : controlsOpen ? setControlsOpen(false) : pendingNew ? setPendingNew(false) : returnToMenu()}
-      dismissible={languageOpen || pendingNew || controlsOpen}
-      footer={controlsOpen ? <Action secondary onPress={() => setControlsOpen(false)}>{tr('done')}</Action> : !languageOpen && !pendingNew ? runActions : undefined}>
+    {inGame && toolsOpen && !arranging && <View testID="snake-tools-panel" style={[s.toolsLayer, { top: insets.top + (compact || width < 600 ? 57 : 67) }]} pointerEvents="box-none">
+      <Pressable accessible={false} onPress={closeTools} style={s.toolsBackdrop} />
+      <ScrollView style={[s.toolsPanel, { right: insets.right + 14, maxHeight: Math.max(120, height - insets.top - insets.bottom - 82) }]}
+        contentContainerStyle={s.toolsContent} bounces={false}>
+        <Text style={s.toolsTitle}>{tr('tools')}</Text>
+        <Pressable accessibilityRole="button" onPress={returnToMenu} style={s.toolRow}><Text style={s.toolIcon}>‹</Text><Text style={s.toolLabel}>{tr('menu')}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={openControls} style={s.toolRow}><Text style={s.toolIcon}>⚙</Text><Text style={s.toolLabel}>{tr('customizeControls')}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={arrangeControls} style={s.toolRow}><Text style={s.toolIcon}>✥</Text><Text style={s.toolLabel}>{tr('moveControls')}</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={orientation.busy} onPress={() => { void rotateGame(); }} style={s.toolRow}><Text style={s.toolIcon}>↻</Text><Text style={s.toolLabel}>{tr('rotateScreen')} · {tr(landscape ? 'portrait' : 'landscape')}</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setToolsOpen(false); setLanguageOpen(true); }} style={s.toolRow}><Text style={s.toolIcon}>{language === 'am' ? 'አማ' : language.toUpperCase()}</Text><Text style={s.toolLabel}>{sharedText('language')}</Text></Pressable>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: soundsEnabled }} accessibilityLabel={tr(soundsEnabled ? 'soundOn' : 'soundOff')}
+          onPress={() => setSoundsEnabled(!soundsEnabled)} style={s.toolRow}><Text style={s.toolIcon}>{soundsEnabled ? '♫' : '♪'}</Text><Text style={s.toolLabel}>{tr(soundsEnabled ? 'soundOn' : 'soundOff')}</Text></Pressable>
+      </ScrollView>
+    </View>}
+
+    <Dialog visible={showRunDialog || pendingNew || languageOpen || controlsOpen || orientationOpen}
+      title={languageOpen ? sharedText('language') : controlsOpen ? tr('customizeControls') : orientationOpen ? tr('screenOrientation') : pendingNew ? tr('replaceTitle') : tr(outcomeKey)}
+      onClose={() => languageOpen ? setLanguageOpen(false) : controlsOpen ? setControlsOpen(false) : orientationOpen ? setOrientationOpen(false) : pendingNew ? setPendingNew(false) : returnToMenu()}
+      dismissible={languageOpen || pendingNew || controlsOpen || orientationOpen}
+      footer={controlsOpen || orientationOpen ? <Action secondary onPress={() => { setControlsOpen(false); setOrientationOpen(false); }}>{tr('done')}</Action> : !languageOpen && !pendingNew ? runActions : undefined}>
       {languageOpen ? <>
         {LANGUAGES.map(item => <Pressable key={item.code} accessibilityRole="radio" accessibilityState={{ checked: language === item.code }}
           onPress={() => { setLanguage(item.code); setLanguageOpen(false); }} style={[s.languageOption, language === item.code && s.languageSelected]}>
           <Text style={s.languageText}>{language === item.code ? '●' : '○'} {item.label}</Text>
         </Pressable>)}
         <Action secondary onPress={() => setLanguageOpen(false)}>{tr('cancel')}</Action>
-      </> : controlsOpen ? <SnakeControlSettings settings={controls} onChange={setControls} onArrange={arrangeControls} tr={tr} /> : pendingNew ? <>
+      </> : controlsOpen || orientationOpen ? <>
+        {controlsOpen && <SnakeControlSettings settings={controls} onChange={setControls} onArrange={arrangeControls} tr={tr} />}
+        <SnakeOrientationSettings requested={orientation.requested} busy={orientation.busy} unavailable={orientation.unavailable}
+          web={Platform.OS === 'web'} onChange={choice => { pause(); void orientation.changeOrientation(choice); }} tr={tr} />
+      </> : pendingNew ? <>
         <Text style={s.dialogBody}>{tr('replaceMessage')}</Text>
         <Action onPress={startFresh}>{tr('replaceAndStart')}</Action>
         <Action secondary onPress={() => setPendingNew(false)}>{tr('cancel')}</Action>
@@ -426,7 +498,8 @@ export default function SnakeScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, marginBottom: 8, maxWidth: 1000, width: '100%', alignSelf: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 48, marginBottom: 4, maxWidth: 1000, width: '100%', alignSelf: 'center' },
+  headerHud: { flex: 1, minWidth: 0, paddingRight: 4 },
   iconButton: { minWidth: 44, height: 44, borderRadius: 15, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line },
   backIcon: { color: C.cream, fontSize: 32, lineHeight: 36 },
   brand: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -438,19 +511,22 @@ const s = StyleSheet.create({
   pauseIcon: { color: C.bg, fontSize: 19, fontWeight: '900' },
   playArea: { flex: 1, width: '100%', maxWidth: 1000, alignSelf: 'center', gap: 8 },
   arena: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 0, minWidth: 0 },
-  modeBadge: { color: C.teal, fontSize: 13, fontWeight: '800' },
-  menuButton: { minHeight: 46, minWidth: 88, paddingHorizontal: 14, borderRadius: 15, backgroundColor: C.panel, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.line, marginTop: 4 },
-  menuButtonText: { color: C.cream, fontSize: 13, fontWeight: '700' },
-  quickActions: { position: 'absolute', bottom: 0, gap: 8, alignItems: 'flex-start' },
-  controlTools: { gap: 8 },
-  controlTool: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.panelRaised, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center' },
-  controlToolGlyph: { color: C.teal, fontSize: 22, fontWeight: '700' },
-  steering: { color: C.mint, fontSize: 21, fontWeight: '800', lineHeight: 26 },
+  toolsActive: { borderColor: C.teal },
+  toolsGlyph: { color: C.cream, fontSize: 24, fontWeight: '700' },
+  toolsLayer: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 20 },
+  toolsBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: '#02101166' },
+  toolsPanel: { position: 'absolute', top: 0, width: 248, backgroundColor: C.panel, borderWidth: 1, borderColor: '#3C5D48', borderRadius: 18 },
+  toolsContent: { padding: 8, gap: 2 },
+  toolsTitle: { color: C.muted, fontSize: 11, fontWeight: '800', padding: 8 },
+  toolRow: { minHeight: 44, paddingVertical: 8, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12 },
+  toolIcon: { color: C.teal, fontSize: 20, width: 28, textAlign: 'center' },
+  toolLabel: { flex: 1, color: C.cream, fontSize: 13, lineHeight: 18, fontWeight: '600' },
   gameHint: { color: C.muted, fontSize: 10, textAlign: 'center', marginTop: 8, lineHeight: 16 },
   countdownOverlay: { ...StyleSheet.absoluteFill, backgroundColor: '#071B1C70', alignItems: 'center', justifyContent: 'center' },
   ready: { color: C.cream, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
   countdown: { fontSize: 80, color: C.mint, fontWeight: '900' },
   feedback: { position: 'absolute', top: 8, right: 12, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: C.panelRaised, borderRadius: 12, borderWidth: 1, borderColor: C.line },
+  levelFeedback: { backgroundColor: '#244638', borderColor: '#8FCE8A' },
   feedbackText: { color: C.mint, fontSize: 16, fontWeight: '900' },
   saveError: { color: '#FDA4AF', fontSize: 12, lineHeight: 18, paddingVertical: 5 },
   backdrop: { flex: 1, backgroundColor: '#021011DD', alignItems: 'center', justifyContent: 'center', padding: 22 },

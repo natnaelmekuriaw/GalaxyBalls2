@@ -21,13 +21,22 @@ Walls, your body, and Arcade rocks end the run. Fill every available cell to win
 | Escape | Pause on web |
 | Ⅱ / ▶ in the header | Pause or resume |
 
-Open **Controls** from the menu, pause card, or the gear beside the pad. Choose
-**Buttons** or **Analog**, then **Large** or **Extra large**.
+Open **Controls** from the menu, pause card, or **☰ → Customize controls**. Choose
+**Buttons** or **Analog**, then **Small**, **Large**, or **Extra large**. Small is
+the default; existing size choices are kept.
 
-To move the pad, choose **Arrange controls** (or tap **✥** beside it). Play pauses.
+To move the pad, choose **Arrange controls** from Controls or **☰**. Play pauses.
 Drag its handle, then tap **✓** to lock the position. On web, arrow keys also move
 the unlocked pad. **↺** resets it to the bottom right. Arranging from the menu
 uses a preview and keeps your saved run.
+
+**☰** shows or hides Menu, Controls, Move, Rotate, Language, and Sound. Opening
+tools pauses play; closing them gives you a countdown before continuing.
+
+Choose **☰ → Rotate screen** or an orientation in Controls for landscape play.
+Turning the device pauses the run while the layout adjusts. Leaving Snake
+restores the previous orientation policy. On web, rotate your device or resize
+the window. The native rotation configuration needs a new app build.
 
 Style, size, position, and lock state are saved on this device. Starting or
 resuming a run locks the pad. During countdown, you can choose your first turn;
@@ -45,6 +54,17 @@ the snake starts moving when the countdown finishes.
 
 Easy, Normal, and Fast start at different speeds. Every five foods speeds up the
 snake. A countdown gives you time to prepare when starting or resuming.
+
+Each berry has a soft pop. Every five berries adds a rising chime, a brief sparkle
+burst, and a new snake tint. The earned color returns with your saved run;
+reduced-motion settings skip the burst.
+
+<details>
+<summary>See a level-up</summary>
+
+<a href="images/snake-level-up.jpg"><img src="images/snake-level-up.jpg" width="220" alt="Level 2 Snake with a mint trail, pickup sparkles, and a level-up banner" /></a>
+
+</details>
 
 Your run and best score for each garden and speed save automatically. Leaving the screen,
 switching apps, or hiding the browser pauses play. After reopening, choose
