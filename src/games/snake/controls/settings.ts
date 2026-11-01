@@ -1,12 +1,16 @@
+export const CONTROL_SIZES = ['SMALL', 'LARGE', 'EXTRA_LARGE'] as const;
+export type SnakeControlSize = (typeof CONTROL_SIZES)[number];
+export const CONTROL_SIZE_LABELS = { SMALL: 'small', LARGE: 'large', EXTRA_LARGE: 'extraLarge' } as const;
+
 export type SnakeControlSettings = {
   style: 'BUTTONS' | 'ANALOG';
-  size: 'LARGE' | 'EXTRA_LARGE';
+  size: SnakeControlSize;
   locked: boolean;
   position: { x: number; y: number };
 };
 
 export function createDefaultControlSettings(): SnakeControlSettings {
-  return { style: 'BUTTONS', size: 'LARGE', locked: true, position: { x: 1, y: 1 } };
+  return { style: 'BUTTONS', size: 'SMALL', locked: true, position: { x: 1, y: 1 } };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -25,7 +29,7 @@ export function parseControlSettings(
   const position = isRecord(saved.position) ? saved.position : {};
   return {
     style: saved.style === 'BUTTONS' || saved.style === 'ANALOG' ? saved.style : fallback.style,
-    size: saved.size === 'LARGE' || saved.size === 'EXTRA_LARGE' ? saved.size : fallback.size,
+    size: saved.size === 'SMALL' || saved.size === 'LARGE' || saved.size === 'EXTRA_LARGE' ? saved.size : fallback.size,
     locked: typeof saved.locked === 'boolean' ? saved.locked : fallback.locked,
     position: { x: coordinate(position.x, fallback.position.x), y: coordinate(position.y, fallback.position.y) },
   };

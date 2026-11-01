@@ -105,7 +105,7 @@ function DirectionButton({ direction, enabled, size, preview, onDirection, label
   </Pressable>;
 }
 
-export function SnakeControls({ enabled, onDirection, label, compact = false, style = 'BUTTONS', size = 'LARGE', preview = false, analogDiameter }: {
+export function SnakeControls({ enabled, onDirection, label, compact = false, style = 'BUTTONS', size = 'SMALL', preview = false, analogDiameter }: {
   enabled: boolean; onDirection: (direction: Direction) => void; label: (direction: Direction) => string;
   compact?: boolean; style?: SnakeControlSettings['style']; size?: SnakeControlSettings['size']; preview?: boolean; analogDiameter?: number;
 }) {

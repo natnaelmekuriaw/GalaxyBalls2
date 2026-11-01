@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { GameText as Text } from '@/shared/components/game-text';
-import type { SnakeControlSettings as ControlSettings } from '../controls/settings';
+import { CONTROL_SIZES, CONTROL_SIZE_LABELS, type SnakeControlSettings as ControlSettings } from '../controls/settings';
 import type { SnakeTranslationKey } from '../i18n/translations';
 import { C } from '../theme';
 
@@ -28,11 +28,11 @@ export function SnakeControlSettings({ settings, onChange, onArrange, tr }: {
     <Text style={s.help}>{tr(settings.style === 'ANALOG' ? 'analogHelp' : 'turnHelp')}</Text>
     <Text style={s.section}>{tr('controlSize')}</Text>
     <View accessibilityRole="radiogroup" accessibilityLabel={tr('controlSize')} style={s.choices}>
-      {(['LARGE', 'EXTRA_LARGE'] as const).map(size => <Pressable key={size} accessibilityRole="radio"
-        accessibilityLabel={tr(size === 'LARGE' ? 'large' : 'extraLarge')} accessibilityState={{ checked: settings.size === size }}
+      {CONTROL_SIZES.map((size, index) => <Pressable key={size} accessibilityRole="radio"
+        accessibilityLabel={tr(CONTROL_SIZE_LABELS[size])} accessibilityState={{ checked: settings.size === size }}
         onPress={() => onChange({ size })} style={({ pressed }) => [s.sizeChoice, settings.size === size && s.selected, pressed && s.pressed]}>
-        <Text style={s.choiceText}>{tr(size === 'LARGE' ? 'large' : 'extraLarge')}</Text>
-        <Text style={s.measure}>{size === 'LARGE' ? '●' : '● ●'}</Text>
+        <Text style={s.sizeText}>{tr(CONTROL_SIZE_LABELS[size])}</Text>
+        <Text style={s.measure}>{'● '.repeat(index + 1).trim()}</Text>
       </Pressable>)}
     </View>
     <View style={s.positionCard}>
@@ -63,7 +63,8 @@ const s = StyleSheet.create({
   choiceText: { color: C.cream, fontSize: 14, fontWeight: '800', textAlign: 'center' },
   radio: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.line },
   radioSelected: { backgroundColor: C.mint },
-  sizeChoice: { flex: 1, minHeight: 56, padding: 10, borderRadius: 14, backgroundColor: C.panelRaised, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  sizeChoice: { flex: 1, minWidth: 0, minHeight: 64, paddingHorizontal: 6, paddingVertical: 10, borderRadius: 14, backgroundColor: C.panelRaised, borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  sizeText: { color: C.cream, fontSize: 12, lineHeight: 18, fontWeight: '800', textAlign: 'center' },
   measure: { color: C.mint, fontSize: 8 },
   help: { color: C.muted, fontSize: 12, lineHeight: 20 },
   positionCard: { gap: 8, backgroundColor: C.panelRaised, padding: 14, borderRadius: 16 },

@@ -1,6 +1,21 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { getControlHeightBudget, getControlMetrics, getControlOffset, clampControlOffset, normalizeControlPosition } from '../../../src/games/snake/controls/layout.ts';
+import { createDefaultControlSettings } from '../../../src/games/snake/controls/settings.ts';
+
+test('the smaller default frees board height while keeping generous touch targets', () => {
+  const defaults = createDefaultControlSettings();
+  const small = getControlMetrics(defaults, true);
+  const previous = getControlMetrics({ ...defaults, size: 'LARGE' }, true);
+  assert.equal(small.buttonSize, 52);
+  assert.ok(small.buttonSize >= 44);
+  assert.equal(small.width, 172);
+  assert.equal(small.padHeight, 112);
+  assert.equal(previous.padHeight - small.padHeight, 24);
+  const analog = getControlMetrics({ ...defaults, style: 'ANALOG' }, true);
+  assert.equal(analog.width, 144);
+  assert.equal(getControlMetrics({ ...defaults, style: 'ANALOG' }, true, 150).width, 128);
+});
 
 test('a short portrait keeps a usable board alongside a comfortable stick', () => {
   const bounds = { width: 292, height: 330 };
@@ -59,7 +74,7 @@ test('dragging clamps all four edges and normalizes positions that survive resiz
   assert.deepEqual(clamped, { x: 0, y: bounds.height - metrics.height });
   assert.deepEqual(normalizeControlPosition(clamped, bounds, metrics), { x: 0, y: 1 });
   for (const style of ['BUTTONS', 'ANALOG']) {
-    for (const size of ['LARGE', 'EXTRA_LARGE']) {
+    for (const size of ['SMALL', 'LARGE', 'EXTRA_LARGE']) {
       const nextMetrics = getControlMetrics({ style, size }, true);
       const nextBounds = { width: 292, height: 320 };
       const normalized = { x: 0.31, y: 0.74 };
