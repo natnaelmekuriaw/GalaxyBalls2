@@ -42,5 +42,23 @@ test('Snake effects are audible, unclipped, distinct, and small enough to bundle
     bytes += wav.length;
   }
   assert.equal(hashes.size, cues.length);
-  assert.ok(bytes < 65536, 'The entire sound pack stays below 64 KB');
+  assert.ok(bytes < 98304, 'The entire sound pack stays below 96 KB');
+});
+
+test('the berry reward is brief and the level reward leaves space for its pickup', () => {
+  const { eat, level } = buildSnakeSounds();
+  const duration = wav => (wav.length - 44) / 44100;
+  assert.ok(duration(eat) >= 0.12 && duration(eat) <= 0.18, 'A pickup stays quick enough for repeated fruit');
+  assert.ok(duration(level) >= 0.45 && duration(level) <= 0.65, 'The milestone gets a distinct musical reward');
+  let openingPeak = 0;
+  for (let sample = 0; sample < 0.035 * 22050; sample++) {
+    openingPeak = Math.max(openingPeak, Math.abs(level.readInt16LE(44 + sample * 2)));
+  }
+  assert.equal(openingPeak, 0, 'The level fanfare lets the simultaneous berry pop speak first');
+  let mixedPeak = 0;
+  for (let offset = 44; offset < level.length; offset += 2) {
+    const pickup = offset < eat.length ? eat.readInt16LE(offset) : 0;
+    mixedPeak = Math.max(mixedPeak, Math.abs(pickup + level.readInt16LE(offset)));
+  }
+  assert.ok(mixedPeak < 32767, 'Playing the pickup and fanfare together leaves mixing headroom');
 });

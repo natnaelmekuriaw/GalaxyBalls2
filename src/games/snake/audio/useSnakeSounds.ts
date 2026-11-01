@@ -16,6 +16,10 @@ const SOURCES: Record<SnakeSoundCue, AudioSource> = {
 
 type Player = ReturnType<typeof createAudioPlayer>;
 
+const VOLUMES: Record<SnakeSoundCue, number> = {
+  start: 0.5, eat: 0.8, turn: 0.22, lose: 0.5, win: 0.6, bonus: 0.7, level: 0.65,
+};
+
 export function useSnakeSounds(enabled: boolean) {
   const playersRef = useRef<Partial<Record<SnakeSoundCue, Player>>>({});
   const enabledRef = useRef(enabled);
@@ -58,7 +62,7 @@ export function useSnakeSounds(enabled: boolean) {
       try {
         const player = createAudioPlayer(SOURCES[cue], { downloadFirst: true, updateInterval: 1000 });
         playersRef.current[cue] = player;
-        player.volume = 0.5;
+        player.volume = VOLUMES[cue];
       } catch { /* An unavailable effect must not prevent the game from opening. */ }
     }
 
