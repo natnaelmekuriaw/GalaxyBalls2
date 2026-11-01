@@ -8,6 +8,7 @@
     "scheme": "galaxyballsexpo",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "requireFullScreen": true,
       "icon": "./assets/branding/galaxy-balls-icon.png"
     },
     "android": {
@@ -24,6 +25,10 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-screen-orientation",
+        { "initialOrientation": "DEFAULT" }
+      ],
       [
         "expo-splash-screen",
         {
