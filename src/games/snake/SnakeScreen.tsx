@@ -11,7 +11,7 @@ import { LANGUAGES } from '@/shared/i18n/translations';
 import { useLanguage } from '@/shared/i18n/LanguageProvider';
 import { useAppPreferences } from '@/shared/preferences/AppPreferencesContext';
 import { useSnakeSounds } from './audio/useSnakeSounds';
-import { SnakeBoard } from './components/SnakeBoard';
+import { SnakeBoard, type SnakeBoardFeedback } from './components/SnakeBoard';
 import { FloatingSnakeControls } from './components/FloatingSnakeControls';
 import { SnakeControlSettings } from './components/SnakeControlSettings';
 import { SnakeHud } from './components/SnakeHud';
@@ -28,10 +28,11 @@ import {
 import { useReducedMotion } from './hooks/useReducedMotion';
 import { translateSnake, type SnakeTranslationKey } from './i18n/translations';
 import { C } from './theme';
+import { getSnakePickupReward } from './presentation/reward';
 
 const directionKey: Record<Direction, SnakeTranslationKey> = { UP: 'up', DOWN: 'down', LEFT: 'left', RIGHT: 'right' };
 const directionGlyph: Record<Direction, string> = { UP: '↑', DOWN: '↓', LEFT: '←', RIGHT: '→' };
-type Feedback = { id: number; kind: 'food' | 'bonus' | 'level'; points: number };
+type Feedback = SnakeBoardFeedback;
 
 function Action({ children, onPress, secondary = false }: { children: ReactNode; onPress: () => void; secondary?: boolean }) {
   return <Pressable accessibilityRole="button" onPress={onPress}
@@ -97,6 +98,7 @@ export default function SnakeScreen() {
   const [playBounds, setPlayBounds] = useState({ width: 0, height: 0 });
   const [recordBeforeRun, setRecordBeforeRun] = useState(0);
   const [feedback, setFeedback] = useState<Feedback | undefined>();
+  const [levelFeedback, setLevelFeedback] = useState<Feedback | undefined>();
   const feedbackId = useRef(0);
   const tr = (key: SnakeTranslationKey, values?: Record<string, string | number>) => translateSnake(language, key, values);
   const terminal = game.status === 'GAME_OVER' || game.status === 'WON';
@@ -121,6 +123,8 @@ export default function SnakeScreen() {
 
   const pause = useCallback(() => {
     countdownClock.cancel();
+    setFeedback(undefined);
+    setLevelFeedback(undefined);
     countdownActive.current = false;
     setCountdown(null);
     setControlGeneration(value => value + 1);
@@ -140,6 +144,7 @@ export default function SnakeScreen() {
     setPace(snapshot.difficulty);
     setMode(snapshot.mode);
     setFeedback(undefined);
+    setLevelFeedback(undefined);
     apply(pauseSnake(snapshot));
     countdownActive.current = true;
     countdownClock.start(setCountdown, () => {
@@ -227,16 +232,18 @@ export default function SnakeScreen() {
       const next = stepSnake(previous);
       if (next === previous) return;
       apply(next);
+      const reward = getSnakePickupReward(previous, next);
       if (next.status === 'GAME_OVER' || next.status === 'WON') {
         stop();
         play(next.status === 'WON' ? 'win' : 'lose');
+        reward?.sounds.forEach(cue => play(cue));
         if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(next.status === 'WON' ? 70 : 120);
-      } else if (next.score > previous.score) {
-        const bonus = next.bonusCollected > previous.bonusCollected;
-        const level = getSnakeLevel(next) > getSnakeLevel(previous);
-        setFeedback({ id: ++feedbackId.current, kind: bonus ? 'bonus' : level ? 'level' : 'food', points: next.score - previous.score });
-        play(bonus ? 'bonus' : level ? 'level' : 'eat');
-        if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(bonus ? 35 : 12);
+      } else if (reward) {
+        const pickup = { id: ++feedbackId.current, kind: reward.kind, points: reward.points, position: reward.position };
+        setFeedback(pickup);
+        if (reward.kind === 'level') setLevelFeedback(pickup);
+        reward.sounds.forEach(cue => play(cue));
+        if (hapticsEnabled && Platform.OS !== 'web') Vibration.vibrate(reward.kind === 'food' ? 12 : 35);
       }
     }, tickMs);
     return () => clearInterval(timer);
@@ -247,6 +254,12 @@ export default function SnakeScreen() {
     const timer = setTimeout(() => setFeedback(undefined), 1100);
     return () => clearTimeout(timer);
   }, [feedback]);
+
+  useEffect(() => {
+    if (!levelFeedback) return;
+    const timer = setTimeout(() => setLevelFeedback(undefined), 1400);
+    return () => clearTimeout(timer);
+  }, [levelFeedback]);
 
   useFocusEffect(useCallback(() => () => pause(), [pause]));
   useEffect(() => {
@@ -359,16 +372,16 @@ export default function SnakeScreen() {
           setArena(previous => previous.width === measuredWidth && previous.height === measuredHeight ? previous : { width: measuredWidth, height: measuredHeight });
         }}>
           {boardSize > 0 && <SnakeBoard state={game} size={boardSize} enabled={!arranging && (game.status === 'PLAYING' || countdown !== null) && isFocused}
-            onDirection={turn} reducedMotion={reducedMotion} feedback={feedback}
+            onDirection={turn} reducedMotion={reducedMotion} feedback={feedback} levelFeedback={levelFeedback}
             label={tr('boardLabel', { mode: tr(modeKey[game.mode]), score: game.score, foods, level: getSnakeLevel(game) })}>
             {countdown !== null && <View pointerEvents="none" style={s.countdownOverlay}>
               <Text style={s.ready}>{tr('ready')}</Text>
               <Text accessibilityRole="header" accessibilityLiveRegion="polite" style={s.countdown}>{countdown}</Text>
             </View>}
           </SnakeBoard>}
-          {feedback && game.status === 'PLAYING' && <View pointerEvents="none" style={s.feedback}>
-            <Text accessibilityLiveRegion="polite" style={[s.feedbackText, feedback.kind === 'bonus' && { color: C.gold }]}>
-              {feedback.kind === 'level' ? tr('levelUp', { level: getSnakeLevel(game) }) : tr('bonusPoints', { points: feedback.points })}
+          {(levelFeedback || feedback) && game.status === 'PLAYING' && <View pointerEvents="none" style={[s.feedback, !!levelFeedback && s.levelFeedback]}>
+            <Text accessibilityLiveRegion="polite" style={[s.feedbackText, !levelFeedback && feedback?.kind === 'bonus' && { color: C.gold }]}>
+              {levelFeedback ? `✦ ${tr('levelUp', { level: getSnakeLevel(game) })}` : tr('bonusPoints', { points: feedback?.points ?? 0 })}
             </Text>
           </View>}
         </View>
@@ -451,6 +464,7 @@ const s = StyleSheet.create({
   ready: { color: C.cream, fontSize: 12, fontWeight: '800', letterSpacing: 2 },
   countdown: { fontSize: 80, color: C.mint, fontWeight: '900' },
   feedback: { position: 'absolute', top: 8, right: 12, paddingVertical: 6, paddingHorizontal: 12, backgroundColor: C.panelRaised, borderRadius: 12, borderWidth: 1, borderColor: C.line },
+  levelFeedback: { backgroundColor: '#244638', borderColor: '#8FCE8A' },
   feedbackText: { color: C.mint, fontSize: 16, fontWeight: '900' },
   saveError: { color: '#FDA4AF', fontSize: 12, lineHeight: 18, paddingVertical: 5 },
   backdrop: { flex: 1, backgroundColor: '#021011DD', alignItems: 'center', justifyContent: 'center', padding: 22 },

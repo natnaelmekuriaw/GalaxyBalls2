@@ -2,11 +2,12 @@ import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'reac
 import { Animated, PanResponder, Platform, StyleSheet, View } from 'react-native';
 
 import { getSwipeDirection } from '../controls/input';
-import { SNAKE_BONUS_TICKS, SNAKE_COLS, SNAKE_ROWS, type Direction, type Point, type SnakeState } from '../engine/snakeEngine';
+import { getSnakeLevel, SNAKE_BONUS_TICKS, SNAKE_COLS, SNAKE_ROWS, type Direction, type Point, type SnakeState } from '../engine/snakeEngine';
+import { getSnakePalette, type SnakePalette } from '../presentation/palette';
 import { C } from '../theme';
 
-const BODY_COLORS = ['#B8F779', '#A5E974', '#8FDB79', '#75CC7B', '#5CBA7A'];
 const HEAD_ROTATION: Record<Direction, string> = { RIGHT: '0deg', DOWN: '90deg', LEFT: '180deg', UP: '-90deg' };
+const SPARK_ANGLES = Array.from({ length: 8 }, (_, index) => index * Math.PI / 4);
 
 const Grid = memo(function Grid({ cell }: { cell: number }) {
   return <>
@@ -43,14 +44,14 @@ function createSwipeResponder(enabled: boolean, onDirection: (direction: Directi
 }
 
 /** The same connected trail gives the menu and the live board one visual identity. */
-export const SnakeTrail = memo(function SnakeTrail({ body, direction, cell, testHead = false }: {
-  body: Point[]; direction: Direction; cell: number; testHead?: boolean;
+export const SnakeTrail = memo(function SnakeTrail({ body, direction, cell, testHead = false, palette = getSnakePalette(1) }: {
+  body: Point[]; direction: Direction; cell: number; testHead?: boolean; palette?: SnakePalette;
 }) {
   return <>
     {body.slice(1).map((point, index) => {
       const previous = body[index];
       const horizontal = point.x !== previous.x;
-      const color = BODY_COLORS[Math.min(Math.floor(index / 3), BODY_COLORS.length - 1)];
+      const color = palette.body[Math.min(Math.floor(index / 3), palette.body.length - 1)];
       return <View key={`join${index}`} style={[styles.trailJoin, {
         left: Math.min(point.x, previous.x) * cell + cell * 0.18,
         top: Math.min(point.y, previous.y) * cell + cell * 0.18,
@@ -62,7 +63,7 @@ export const SnakeTrail = memo(function SnakeTrail({ body, direction, cell, test
       const head = index === 0;
       const tail = index === body.length - 1;
       const inset = head ? 0.015 : tail ? 0.2 : 0.08;
-      const color = head ? C.mint : BODY_COLORS[Math.min(Math.floor((index - 1) / 3), BODY_COLORS.length - 1)];
+      const color = head ? palette.head : palette.body[Math.min(Math.floor((index - 1) / 3), palette.body.length - 1)];
       return <View key={index} testID={head && testHead ? 'snake-head' : undefined} style={[styles.segment, {
         left: point.x * cell + cell * inset, top: point.y * cell + cell * inset,
         width: cell * (1 - inset * 2), height: cell * (1 - inset * 2),
@@ -72,7 +73,7 @@ export const SnakeTrail = memo(function SnakeTrail({ body, direction, cell, test
       }]}>
         {head ? <>
           <View style={[styles.tongue, { right: -cell * 0.13, top: cell * 0.46, width: cell * 0.21, height: Math.max(1, cell * 0.06), borderRadius: cell * 0.04 }]} />
-          <View style={[styles.snout, { right: -cell * 0.01, top: cell * 0.28, width: cell * 0.13, height: cell * 0.42, borderRadius: cell * 0.13 }]} />
+          <View style={[styles.snout, { backgroundColor: palette.head, right: -cell * 0.01, top: cell * 0.28, width: cell * 0.13, height: cell * 0.42, borderRadius: cell * 0.13 }]} />
           {[0.12, 0.59].map(top => <View key={top} style={[styles.eye, {
             left: cell * 0.54, top: cell * top, width: cell * 0.32, height: cell * 0.31, borderRadius: cell * 0.17,
           }]}><View style={[styles.pupil, { width: cell * 0.13, height: cell * 0.16, borderRadius: cell * 0.08, right: cell * 0.035, top: cell * 0.07 }]} /></View>)}
@@ -105,30 +106,69 @@ export function GardenRock({ cell }: { cell: number }) {
   </View>;
 }
 
-export type SnakeBoardFeedback = { id: number; kind: 'food' | 'bonus' | 'level'; points: number };
+export type SnakeBoardFeedback = { id: number; kind: 'food' | 'bonus' | 'level'; points: number; position?: Point };
 
-export function SnakeBoard({ state, size, label, onDirection, enabled, children, reducedMotion = false, feedback }: {
+const PickupBurst = memo(function PickupBurst({ feedback, point, cell, accent, enabled, reducedMotion }: {
+  feedback: SnakeBoardFeedback; point: Point; cell: number; accent: string; enabled: boolean; reducedMotion: boolean;
+}) {
+  const [progress] = useState(() => new Animated.Value(1));
+  const [origin] = useState(() => ({ ...(feedback.position ?? point) }));
+  const consumed = useRef(false);
+  const level = feedback.kind === 'level';
+  const color = feedback.kind === 'bonus' ? C.gold : accent;
+  useEffect(() => {
+    progress.stopAnimation();
+    if (!enabled || reducedMotion || consumed.current) {
+      consumed.current = true;
+      progress.setValue(1);
+      return;
+    }
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1, duration: level ? 800 : 380,
+      useNativeDriver: Platform.OS !== 'web', isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, enabled, reducedMotion, level]);
+  if (reducedMotion) return null;
+
+  const centerX = (origin.x + 0.5) * cell;
+  const centerY = (origin.y + 0.5) * cell;
+  const opacity = progress.interpolate({ inputRange: [0, 0.18, 1], outputRange: [0.9, 0.75, 0] });
+  const sparkSize = Math.max(3, cell * 0.2);
+  return <View pointerEvents="none" accessible={false} style={styles.rewardLayer}>
+    <Animated.View testID={level ? 'snake-level-burst' : 'snake-pickup-burst'} style={[styles.bloom, {
+      left: centerX - cell, top: centerY - cell, width: cell * 2, height: cell * 2,
+      borderRadius: cell, borderColor: color, opacity,
+      transform: [{ scale: progress.interpolate({ inputRange: [0, 1], outputRange: [0.4, level ? 2.4 : 1.6] }) }],
+    }]} />
+    {level && <>
+      <Animated.View style={[styles.levelEdge, { borderColor: accent,
+        opacity: progress.interpolate({ inputRange: [0, 0.14, 0.45, 1], outputRange: [0, 0.65, 0.35, 0] }),
+      }]} />
+      {SPARK_ANGLES.map((angle, index) => <Animated.View key={index} style={[styles.spark, {
+        left: centerX - sparkSize / 2, top: centerY - sparkSize / 2,
+        width: sparkSize, height: sparkSize, backgroundColor: index % 2 ? C.cream : accent, opacity,
+        transform: [
+          { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [Math.cos(angle) * cell * 0.35, Math.cos(angle) * cell * 2.8] }) },
+          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [Math.sin(angle) * cell * 0.35, Math.sin(angle) * cell * 2.8] }) },
+          { rotate: '45deg' },
+          { scale: progress.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.4, 1, 0.3] }) },
+        ],
+      }]} />)}
+    </>}
+  </View>;
+});
+
+export function SnakeBoard({ state, size, label, onDirection, enabled, children, reducedMotion = false, feedback, levelFeedback }: {
   state: SnakeState; size: number; label: string; onDirection: (direction: Direction) => void;
-  enabled: boolean; children?: ReactNode; reducedMotion?: boolean; feedback?: SnakeBoardFeedback;
+  enabled: boolean; children?: ReactNode; reducedMotion?: boolean; feedback?: SnakeBoardFeedback; levelFeedback?: SnakeBoardFeedback;
 }) {
   const cell = size / SNAKE_COLS;
   const responder = useMemo(() => createSwipeResponder(enabled, onDirection), [enabled, onDirection]);
-  const [bloom] = useState(() => new Animated.Value(1));
-  const lastFeedback = useRef<number | undefined>(undefined);
-  const feedbackId = feedback?.id;
-  useEffect(() => {
-    bloom.stopAnimation();
-    const fresh = feedbackId !== lastFeedback.current;
-    lastFeedback.current = feedbackId;
-    if (!fresh || feedbackId === undefined || reducedMotion || !enabled) {
-      bloom.setValue(1);
-      return;
-    }
-    bloom.setValue(0);
-    const animation = Animated.timing(bloom, { toValue: 1, duration: 420, useNativeDriver: Platform.OS !== 'web' });
-    animation.start();
-    return () => animation.stop();
-  }, [feedbackId, reducedMotion, bloom, enabled]);
+  const palette = getSnakePalette(getSnakeLevel(state));
+  const milestone = levelFeedback ?? (feedback?.kind === 'level' ? feedback : undefined);
   const bonus = state.bonus;
 
   return <View style={[styles.frame, { width: size + 8, height: size + 8 }]}>
@@ -141,14 +181,11 @@ export function SnakeBoard({ state, size, label, onDirection, enabled, children,
         <GardenFruit cell={cell} golden />
         <View style={[styles.bonusTrack, { top: cell * 0.96, width: cell * 0.9, left: cell * 0.05 }]}><View style={[styles.bonusLife, { width: `${bonus.ticksLeft / SNAKE_BONUS_TICKS * 100}%` }]} /></View>
       </View>}
-      <SnakeTrail body={state.body} direction={state.direction} cell={cell} testHead />
-      {feedback && !reducedMotion && <Animated.View pointerEvents="none" style={[styles.bloom, {
-        left: state.body[0].x * cell - cell * 0.5, top: state.body[0].y * cell - cell * 0.5,
-        width: cell * 2, height: cell * 2, borderRadius: cell,
-        borderColor: feedback.kind === 'bonus' ? C.gold : C.mint,
-        opacity: bloom.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0] }),
-        transform: [{ scale: bloom.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.8] }) }],
-      }]} />}
+      <SnakeTrail body={state.body} direction={state.direction} cell={cell} palette={palette} testHead />
+      {feedback && feedback.kind !== 'level' && <PickupBurst key={`pickup-${feedback.id}`} feedback={feedback}
+        point={feedback.position ?? state.body[0]} cell={cell} accent={palette.accent} enabled={enabled} reducedMotion={reducedMotion} />}
+      {milestone && <PickupBurst key={`level-${milestone.id}`} feedback={milestone}
+        point={milestone.position ?? state.body[0]} cell={cell} accent={palette.accent} enabled={enabled} reducedMotion={reducedMotion} />}
       <View pointerEvents="none" style={styles.fieldShine} />
     </View>
     {children}
@@ -183,4 +220,7 @@ const styles = StyleSheet.create({
   rockFacet: { position: 'absolute', backgroundColor: '#B8C8B24D', transform: [{ rotate: '-15deg' }] },
   rockMoss: { position: 'absolute', backgroundColor: '#7A9D54' },
   bloom: { position: 'absolute', borderWidth: 2, zIndex: 4 },
+  rewardLayer: { ...StyleSheet.absoluteFill, zIndex: 4, pointerEvents: 'none' },
+  levelEdge: { ...StyleSheet.absoluteFill, borderWidth: 2, borderRadius: 18 },
+  spark: { position: 'absolute', borderRadius: 1 },
 });
