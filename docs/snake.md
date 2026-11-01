@@ -46,6 +46,17 @@ the snake starts moving when the countdown finishes.
 Easy, Normal, and Fast start at different speeds. Every five foods speeds up the
 snake. A countdown gives you time to prepare when starting or resuming.
 
+Each berry has a soft pop. Every five berries adds a rising chime, a brief sparkle
+burst, and a new snake tint. The earned color returns with your saved run;
+reduced-motion settings skip the burst.
+
+<details>
+<summary>See a level-up</summary>
+
+<a href="images/snake-level-up.jpg"><img src="images/snake-level-up.jpg" width="220" alt="Level 2 Snake with a mint trail, pickup sparkles, and a level-up banner" /></a>
+
+</details>
+
 Your run and best score for each garden and speed save automatically. Leaving the screen,
 switching apps, or hiding the browser pauses play. After reopening, choose
 **Resume**. Starting a new run asks before replacing an unfinished one.
