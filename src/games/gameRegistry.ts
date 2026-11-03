@@ -31,8 +31,10 @@ export const GAME_REGISTRY = [
   },
   {
     id: 'ludo',
-    status: 'comingLater',
+    status: 'available',
     title: 'Ludo',
+    href: '/games/ludo' as Href,
     descriptionKey: 'ludoDescription',
+    openLabelKey: 'openLudo',
   },
 ] as const satisfies readonly GameDefinition[];
