@@ -47,7 +47,8 @@ const labels: Record<Language, Record<string, string>> = {
     "music": "ሙዚቃ",
     "sound": "የድምፅ ተፅእኖዎች",
     "on": "በርቷል",
-    "off": "ጠፍቷል"
+    "off": "ጠፍቷል",
+    "purple": "ሐምራዊ"
   },
   "om": {}
 };
