@@ -93,7 +93,8 @@ const labels: Record<Language, Record<string, string>> = {
     "saved": "Adeemsi ofumaan kuufama",
     "quick": "Tapha ariifataa",
     "volume": "Sagalee",
-    "local": "Meeshaa kana irratti waliin taphadhaa"
+    "local": "Meeshaa kana irratti waliin taphadhaa",
+    "sixPlayers": "Gabatee taphattoota jaʼaa"
   }
 };
 export function ludoOption(language: Language, key: string): string {
