@@ -65,7 +65,9 @@ const labels: Record<Language, Record<string, string>> = {
     "sixPlayers": "የስድስት ተጫዋች ሰሌዳ",
     "fourPlayers": "መደበኛ ሰሌዳ"
   },
-  "om": {}
+  "om": {
+    "style": "Bifa gabatee"
+  }
 };
 export function ludoOption(language: Language, key: string): string {
   return labels[language]?.[key] ?? labels.en[key] ?? key;
