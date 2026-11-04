@@ -35,7 +35,8 @@ const labels: Record<Language, Record<string, string>> = {
   },
   "am": {
     "style": "የሰሌዳ ቅጥ",
-    "classic": "መደበኛ"
+    "classic": "መደበኛ",
+    "jewel": "ዕንቁ"
   },
   "om": {}
 };
