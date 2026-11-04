@@ -58,7 +58,8 @@ const labels: Record<Language, Record<string, string>> = {
     "roll": "ጣል",
     "choose": "ቁራጭ ንካ",
     "winning": "አሸናፊ",
-    "saved": "እድገት በራስ ሰር ይቀመጣል"
+    "saved": "እድገት በራስ ሰር ይቀመጣል",
+    "quick": "ፈጣን ጨዋታ"
   },
   "om": {}
 };
