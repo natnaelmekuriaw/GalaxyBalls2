@@ -80,7 +80,8 @@ const labels: Record<Language, Record<string, string>> = {
     "sound": "Sagalee taphaa",
     "on": "Banaa",
     "off": "Cufaa",
-    "purple": "Dhiilgee"
+    "purple": "Dhiilgee",
+    "orange": "Burtukaanaa"
   }
 };
 export function ludoOption(language: Language, key: string): string {
