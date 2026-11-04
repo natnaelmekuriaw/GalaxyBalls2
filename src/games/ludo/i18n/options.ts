@@ -53,7 +53,8 @@ const labels: Record<Language, Record<string, string>> = {
     "board": "ሰሌዳ",
     "match": "የጨዋታ ዝግጅት",
     "close": "ዝጋ",
-    "resume": "ቀጥል"
+    "resume": "ቀጥል",
+    "newGame": "አዲስ ጨዋታ"
   },
   "om": {}
 };
