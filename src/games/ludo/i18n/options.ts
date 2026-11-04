@@ -79,7 +79,8 @@ const labels: Record<Language, Record<string, string>> = {
     "music": "Muuziqaa",
     "sound": "Sagalee taphaa",
     "on": "Banaa",
-    "off": "Cufaa"
+    "off": "Cufaa",
+    "purple": "Dhiilgee"
   }
 };
 export function ludoOption(language: Language, key: string): string {
