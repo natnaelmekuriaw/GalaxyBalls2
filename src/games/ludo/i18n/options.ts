@@ -34,7 +34,8 @@ const labels: Record<Language, Record<string, string>> = {
     "fourPlayers": "Classic board"
   },
   "am": {
-    "style": "የሰሌዳ ቅጥ"
+    "style": "የሰሌዳ ቅጥ",
+    "classic": "መደበኛ"
   },
   "om": {}
 };
