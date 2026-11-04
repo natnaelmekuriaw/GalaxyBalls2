@@ -45,7 +45,8 @@ const labels: Record<Language, Record<string, string>> = {
     "start": "ተጫወት",
     "options": "የጨዋታ አማራጮች",
     "music": "ሙዚቃ",
-    "sound": "የድምፅ ተፅእኖዎች"
+    "sound": "የድምፅ ተፅእኖዎች",
+    "on": "በርቷል"
   },
   "om": {}
 };
