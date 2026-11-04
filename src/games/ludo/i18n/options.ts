@@ -20,7 +20,8 @@ const labels: Record<Language, Record<string, string>> = {
     "orange": "Orange",
     "board": "Board",
     "match": "Match setup",
-    "close": "Close"
+    "close": "Close",
+    "resume": "Continue"
   },
   "am": {},
   "om": {}
