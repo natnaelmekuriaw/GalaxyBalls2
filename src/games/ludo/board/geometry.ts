@@ -2,7 +2,7 @@ import { FINISH, SAFE_INDEX, START_INDEX, trackIndex, type LudoColor } from '../
 
 export type Cell = { x: number; y: number };
 
-export const TRACK: Cell[] = [
+const RAW_TRACK: Cell[] = [
   ...Array.from({ length: 5 }, (_, offset) => ({ x: 6, y: offset + 1 })),
   ...Array.from({ length: 6 }, (_, offset) => ({ x: 5 - offset, y: 6 })),
   { x: 0, y: 7 }, { x: 0, y: 8 },
@@ -17,22 +17,29 @@ export const TRACK: Cell[] = [
   { x: 7, y: 0 }, { x: 6, y: 0 },
 ];
 
-export const HOME_LANES: Record<LudoColor, Cell[]> = {
+const RAW_HOME_LANES: Record<LudoColor, Cell[]> = {
   red: Array.from({ length: 6 }, (_, offset) => ({ x: 7, y: offset + 1 })),
   green: Array.from({ length: 6 }, (_, offset) => ({ x: offset + 1, y: 7 })),
   yellow: Array.from({ length: 6 }, (_, offset) => ({ x: 7, y: 13 - offset })),
+  purple: [], orange: [],
   blue: Array.from({ length: 6 }, (_, offset) => ({ x: 13 - offset, y: 7 })),
 };
 
-export const YARDS: Record<LudoColor, Cell[]> = {
+const RAW_YARDS: Record<LudoColor, Cell[]> = {
   red: [{ x: 1, y: 1 }, { x: 4, y: 1 }, { x: 1, y: 4 }, { x: 4, y: 4 }],
   green: [{ x: 1, y: 10 }, { x: 4, y: 10 }, { x: 1, y: 13 }, { x: 4, y: 13 }],
   yellow: [{ x: 10, y: 10 }, { x: 13, y: 10 }, { x: 10, y: 13 }, { x: 13, y: 13 }],
+  purple: [], orange: [],
   blue: [{ x: 10, y: 1 }, { x: 13, y: 1 }, { x: 10, y: 4 }, { x: 13, y: 4 }],
 };
 
+const transpose = (point: Cell): Cell => ({ x: point.y, y: point.x });
+export const TRACK = RAW_TRACK.map(transpose);
+export const HOME_LANES = Object.fromEntries(Object.entries(RAW_HOME_LANES).map(([color, cells]) => [color, cells.map(transpose)])) as Record<LudoColor, Cell[]>;
+export const YARDS = Object.fromEntries(Object.entries(RAW_YARDS).map(([color, cells]) => [color, cells.map(transpose)])) as Record<LudoColor, Cell[]>;
+
 export const COLORS: Record<LudoColor, string> = {
-  red: '#F36E75', green: '#50C99D', yellow: '#F2C760', blue: '#69A9F5',
+  red: '#F5090A', green: '#00A51B', yellow: '#FFE000', blue: '#04AFE1', purple: '#9138C6', orange: '#F58216',
 };
 
 export function tokenCell(color: LudoColor, token: number, progress: number): Cell {
@@ -44,10 +51,10 @@ export function tokenCell(color: LudoColor, token: number, progress: number): Ce
 
 export function cellColor(x: number, y: number): LudoColor | null {
   if (x < 6 && y < 6) return 'red';
-  if (x < 6 && y > 8) return 'green';
+  if (x < 6 && y > 8) return 'blue';
   if (x > 8 && y > 8) return 'yellow';
-  if (x > 8 && y < 6) return 'blue';
-  for (const color of Object.keys(HOME_LANES) as LudoColor[]) {
+  if (x > 8 && y < 6) return 'green';
+  for (const color of ['red', 'green', 'yellow', 'blue'] as LudoColor[]) {
     if (HOME_LANES[color].some(cell => cell.x === x && cell.y === y)) return color;
     const start = TRACK[START_INDEX[color]];
     if (start.x === x && start.y === y) return color;
