@@ -78,7 +78,8 @@ const labels: Record<Language, Record<string, string>> = {
     "options": "Filannoowwan taphaa",
     "music": "Muuziqaa",
     "sound": "Sagalee taphaa",
-    "on": "Banaa"
+    "on": "Banaa",
+    "off": "Cufaa"
   }
 };
 export function ludoOption(language: Language, key: string): string {
