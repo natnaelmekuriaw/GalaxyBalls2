@@ -10,7 +10,8 @@ const labels: Record<Language, Record<string, string>> = {
     "players": "Players",
     "humans": "People",
     "computers": "Computers",
-    "start": "Play"
+    "start": "Play",
+    "options": "Game options"
   },
   "am": {},
   "om": {}
