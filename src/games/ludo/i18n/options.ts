@@ -56,7 +56,8 @@ const labels: Record<Language, Record<string, string>> = {
     "resume": "ቀጥል",
     "newGame": "አዲስ ጨዋታ",
     "roll": "ጣል",
-    "choose": "ቁራጭ ንካ"
+    "choose": "ቁራጭ ንካ",
+    "winning": "አሸናፊ"
   },
   "om": {}
 };
