@@ -50,7 +50,8 @@ const labels: Record<Language, Record<string, string>> = {
     "off": "ጠፍቷል",
     "purple": "ሐምራዊ",
     "orange": "ብርቱካናማ",
-    "board": "ሰሌዳ"
+    "board": "ሰሌዳ",
+    "match": "የጨዋታ ዝግጅት"
   },
   "om": {}
 };
