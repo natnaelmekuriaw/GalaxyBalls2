@@ -17,7 +17,8 @@ const labels: Record<Language, Record<string, string>> = {
     "on": "On",
     "off": "Off",
     "purple": "Purple",
-    "orange": "Orange"
+    "orange": "Orange",
+    "board": "Board"
   },
   "am": {},
   "om": {}
