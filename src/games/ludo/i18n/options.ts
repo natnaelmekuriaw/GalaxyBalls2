@@ -43,7 +43,8 @@ const labels: Record<Language, Record<string, string>> = {
     "humans": "ሰዎች",
     "computers": "ኮምፒውተሮች",
     "start": "ተጫወት",
-    "options": "የጨዋታ አማራጮች"
+    "options": "የጨዋታ አማራጮች",
+    "music": "ሙዚቃ"
   },
   "om": {}
 };
