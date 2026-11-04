@@ -89,7 +89,8 @@ const labels: Record<Language, Record<string, string>> = {
     "newGame": "Tapha haaraa",
     "roll": "Darbadhu",
     "choose": "Caccabaa tuqi",
-    "winning": "Injifataa"
+    "winning": "Injifataa",
+    "saved": "Adeemsi ofumaan kuufama"
   }
 };
 export function ludoOption(language: Language, key: string): string {
