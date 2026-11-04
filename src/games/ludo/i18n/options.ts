@@ -44,7 +44,8 @@ const labels: Record<Language, Record<string, string>> = {
     "computers": "ኮምፒውተሮች",
     "start": "ተጫወት",
     "options": "የጨዋታ አማራጮች",
-    "music": "ሙዚቃ"
+    "music": "ሙዚቃ",
+    "sound": "የድምፅ ተፅእኖዎች"
   },
   "om": {}
 };
