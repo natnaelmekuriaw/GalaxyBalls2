@@ -94,7 +94,8 @@ const labels: Record<Language, Record<string, string>> = {
     "quick": "Tapha ariifataa",
     "volume": "Sagalee",
     "local": "Meeshaa kana irratti waliin taphadhaa",
-    "sixPlayers": "Gabatee taphattoota jaʼaa"
+    "sixPlayers": "Gabatee taphattoota jaʼaa",
+    "fourPlayers": "Gabatee idilee"
   }
 };
 export function ludoOption(language: Language, key: string): string {
