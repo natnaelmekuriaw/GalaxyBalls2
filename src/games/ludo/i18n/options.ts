@@ -42,7 +42,8 @@ const labels: Record<Language, Record<string, string>> = {
     "players": "ተጫዋቾች",
     "humans": "ሰዎች",
     "computers": "ኮምፒውተሮች",
-    "start": "ተጫወት"
+    "start": "ተጫወት",
+    "options": "የጨዋታ አማራጮች"
   },
   "om": {}
 };
