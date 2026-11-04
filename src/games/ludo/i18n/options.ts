@@ -61,7 +61,8 @@ const labels: Record<Language, Record<string, string>> = {
     "saved": "እድገት በራስ ሰር ይቀመጣል",
     "quick": "ፈጣን ጨዋታ",
     "volume": "ድምፅ",
-    "local": "በዚህ መሣሪያ አብራችሁ ተጫወቱ"
+    "local": "በዚህ መሣሪያ አብራችሁ ተጫወቱ",
+    "sixPlayers": "የስድስት ተጫዋች ሰሌዳ"
   },
   "om": {}
 };
