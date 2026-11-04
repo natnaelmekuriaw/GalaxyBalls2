@@ -29,7 +29,8 @@ const labels: Record<Language, Record<string, string>> = {
     "saved": "Progress saves automatically",
     "quick": "Quick match",
     "volume": "Audio",
-    "local": "Play together on this device"
+    "local": "Play together on this device",
+    "sixPlayers": "Six-player board"
   },
   "am": {},
   "om": {}
