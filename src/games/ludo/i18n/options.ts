@@ -66,7 +66,8 @@ const labels: Record<Language, Record<string, string>> = {
     "fourPlayers": "መደበኛ ሰሌዳ"
   },
   "om": {
-    "style": "Bifa gabatee"
+    "style": "Bifa gabatee",
+    "classic": "Idilee"
   }
 };
 export function ludoOption(language: Language, key: string): string {
