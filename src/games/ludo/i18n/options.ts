@@ -13,7 +13,8 @@ const labels: Record<Language, Record<string, string>> = {
     "start": "Play",
     "options": "Game options",
     "music": "Music",
-    "sound": "Sound effects"
+    "sound": "Sound effects",
+    "on": "On"
   },
   "am": {},
   "om": {}
