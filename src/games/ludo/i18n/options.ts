@@ -74,7 +74,8 @@ const labels: Record<Language, Record<string, string>> = {
     "players": "Taphattoota",
     "humans": "Namoota",
     "computers": "Koompiitaroota",
-    "start": "Taphadhu"
+    "start": "Taphadhu",
+    "options": "Filannoowwan taphaa"
   }
 };
 export function ludoOption(language: Language, key: string): string {
