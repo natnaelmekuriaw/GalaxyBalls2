@@ -51,7 +51,8 @@ const labels: Record<Language, Record<string, string>> = {
     "purple": "ሐምራዊ",
     "orange": "ብርቱካናማ",
     "board": "ሰሌዳ",
-    "match": "የጨዋታ ዝግጅት"
+    "match": "የጨዋታ ዝግጅት",
+    "close": "ዝጋ"
   },
   "om": {}
 };
