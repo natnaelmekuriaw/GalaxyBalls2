@@ -1,4 +1,4 @@
-import { FINISH, LUDO_COLORS, legalTokens, type LudoColor, type LudoEvent, type LudoState } from '../engine/ludoEngine.ts';
+import { finishFor, LUDO_COLORS, legalTokens, type LudoColor, type LudoEvent, type LudoState } from '../engine/ludoEngine.ts';
 
 export const LUDO_SAVE_KEY = '@ludo/current-match';
 const EVENTS: LudoEvent[] = ['new', 'roll', 'noMove', 'threeSixes', 'capture', 'home', 'move', 'win'];
@@ -16,7 +16,7 @@ export function parseLudoSave(raw: string | null): LudoState | null {
   let value: unknown;
   try { value = JSON.parse(raw); } catch { return null; }
   if (!record(value) || value.version !== 1 || !Array.isArray(value.seats)
-    || value.seats.length < 2 || value.seats.length > 4
+    || value.seats.length < 2 || value.seats.length > 6
     || !integer(value.turn, 0, value.seats.length - 1)
     || !integer(value.seed, 0, 4294967295)
     || !integer(value.sixes, 0, 2)
@@ -26,14 +26,16 @@ export function parseLudoSave(raw: string | null): LudoState | null {
     || (value.phase === 'choose' ? !integer(value.die, 1, 6) : value.die !== null)) return null;
   const expectedColors = value.seats.length === 2 ? ['red', 'yellow'] : LUDO_COLORS.slice(0, value.seats.length);
   const seats = value.seats;
+  if (value.rolls !== undefined && (!record(value.rolls) || Object.entries(value.rolls).some(([color, die]) =>
+    !LUDO_COLORS.includes(color as LudoColor) || !integer(die, 1, 6)))) return null;
   if (!seats.every((seat, index) => record(seat) && seat.color === expectedColors[index]
     && (seat.kind === 'human' || seat.kind === 'computer')
     && Array.isArray(seat.tokens) && seat.tokens.length === 4
-    && seat.tokens.every((progress: unknown) => integer(progress, -1, FINISH)))
+    && seat.tokens.every((progress: unknown) => integer(progress, -1, seats.length > 4 ? 84 : 58)))
     || !seats.some(seat => seat.kind === 'human')) return null;
   const winner = value.winner;
   if (value.phase === 'finished'
-    ? !LUDO_COLORS.includes(winner as LudoColor) || !seats.some(seat => seat.color === winner && seat.tokens.every((progress: number) => progress === FINISH))
+    ? !LUDO_COLORS.includes(winner as LudoColor) || !seats.some(seat => seat.color === winner && seat.tokens.every((progress: number) => progress === finishFor(value as LudoState)))
     : winner !== null) return null;
   const game = value as LudoState;
   if (game.phase === 'choose' && legalTokens(game).length === 0) return null;
