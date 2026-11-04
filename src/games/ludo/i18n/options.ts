@@ -4,7 +4,8 @@ const labels: Record<Language, Record<string, string>> = {
   "en": {
     "style": "Board style",
     "classic": "Classic",
-    "jewel": "Jewel"
+    "jewel": "Jewel",
+    "garden": "Garden"
   },
   "am": {},
   "om": {}
