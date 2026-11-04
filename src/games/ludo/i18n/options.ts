@@ -21,7 +21,8 @@ const labels: Record<Language, Record<string, string>> = {
     "board": "Board",
     "match": "Match setup",
     "close": "Close",
-    "resume": "Continue"
+    "resume": "Continue",
+    "newGame": "New match"
   },
   "am": {},
   "om": {}
