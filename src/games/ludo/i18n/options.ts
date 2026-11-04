@@ -30,7 +30,8 @@ const labels: Record<Language, Record<string, string>> = {
     "quick": "Quick match",
     "volume": "Audio",
     "local": "Play together on this device",
-    "sixPlayers": "Six-player board"
+    "sixPlayers": "Six-player board",
+    "fourPlayers": "Classic board"
   },
   "am": {},
   "om": {}
