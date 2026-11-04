@@ -6,7 +6,8 @@ const labels: Record<Language, Record<string, string>> = {
     "classic": "Classic",
     "jewel": "Jewel",
     "garden": "Garden",
-    "pastel": "Pastel"
+    "pastel": "Pastel",
+    "players": "Players"
   },
   "am": {},
   "om": {}
