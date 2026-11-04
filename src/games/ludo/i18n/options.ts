@@ -91,7 +91,8 @@ const labels: Record<Language, Record<string, string>> = {
     "choose": "Caccabaa tuqi",
     "winning": "Injifataa",
     "saved": "Adeemsi ofumaan kuufama",
-    "quick": "Tapha ariifataa"
+    "quick": "Tapha ariifataa",
+    "volume": "Sagalee"
   }
 };
 export function ludoOption(language: Language, key: string): string {
