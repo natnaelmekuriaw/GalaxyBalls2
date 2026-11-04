@@ -10,7 +10,7 @@ test('two players sit opposite; local groups and computer matches have the reque
     ['human', 'computer', 'computer', 'computer']);
   assert.equal(createLudoGame({ humans: 4, computers: 0 }).seats.length, 4);
   assert.throws(() => createLudoGame({ humans: 1, computers: 0 }));
-  assert.throws(() => createLudoGame({ humans: 1, computers: 4 }));
+  assert.throws(() => createLudoGame({ humans: 1, computers: 6 }));
 });
 
 test('a six releases a token and earns another roll; other rolls pass the turn', () => {
