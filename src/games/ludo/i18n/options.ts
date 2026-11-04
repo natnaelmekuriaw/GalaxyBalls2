@@ -3,7 +3,8 @@ import type { Language } from '@/shared/i18n/translations';
 const labels: Record<Language, Record<string, string>> = {
   "en": {
     "style": "Board style",
-    "classic": "Classic"
+    "classic": "Classic",
+    "jewel": "Jewel"
   },
   "am": {},
   "om": {}
