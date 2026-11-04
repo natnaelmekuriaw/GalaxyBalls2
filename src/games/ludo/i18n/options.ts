@@ -1,6 +1,6 @@
 import type { Language } from '@/shared/i18n/translations';
 
-const labels: Record<Language, Record<string, string>> = {
+export const LUDO_OPTION_LABELS: Record<Language, Record<string, string>> = {
   "en": {
     "style": "Board style",
     "classic": "Classic",
@@ -99,5 +99,5 @@ const labels: Record<Language, Record<string, string>> = {
   }
 };
 export function ludoOption(language: Language, key: string): string {
-  return labels[language]?.[key] ?? labels.en[key] ?? key;
+  return LUDO_OPTION_LABELS[language]?.[key] ?? LUDO_OPTION_LABELS.en[key] ?? key;
 }
