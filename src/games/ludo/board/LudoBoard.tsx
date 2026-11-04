@@ -30,6 +30,8 @@ export function LudoBoard({ game, size, legal, boardLabel, onMove, tokenLabel }:
     const progress = current.tokens[index];
     return tokenCell(current.color, index, progress === -1 ? 0 : progress + (game.die ?? 0));
   }) : [];
+  const isSelectable = (token: BoardToken) => game.phase === 'choose' && token.seat === game.turn && legal.includes(token.index);
+  const orderedTokens = [...tokens].sort((left, right) => Number(isSelectable(left)) - Number(isSelectable(right)));
 
   return <View testID="ludo-board" accessibilityLabel={boardLabel} style={[styles.board, { width: size, height: size, borderRadius: cell * 0.55 }]}>
     {Array.from({ length: 15 }, (_, y) => <View key={y} style={styles.row}>
@@ -76,8 +78,8 @@ export function LudoBoard({ game, size, legal, boardLabel, onMove, tokenLabel }:
       width: cell * 0.6, height: cell * 0.6, borderRadius: cell * 0.3,
       borderColor: COLORS[current.color],
     }]} />)}
-    {tokens.map(token => {
-      const selectable = game.phase === 'choose' && token.seat === game.turn && legal.includes(token.index);
+    {orderedTokens.map(token => {
+      const selectable = isSelectable(token);
       const small = token.count > 1;
       const diameter = cell * (small ? 0.68 : 0.94);
       const slot = token.stack % 4;
