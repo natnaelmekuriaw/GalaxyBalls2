@@ -9,7 +9,8 @@ const labels: Record<Language, Record<string, string>> = {
     "pastel": "Pastel",
     "players": "Players",
     "humans": "People",
-    "computers": "Computers"
+    "computers": "Computers",
+    "start": "Play"
   },
   "am": {},
   "om": {}
