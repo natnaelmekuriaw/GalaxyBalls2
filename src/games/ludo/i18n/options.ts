@@ -87,7 +87,8 @@ const labels: Record<Language, Record<string, string>> = {
     "close": "Cufi",
     "resume": "Itti fufi",
     "newGame": "Tapha haaraa",
-    "roll": "Darbadhu"
+    "roll": "Darbadhu",
+    "choose": "Caccabaa tuqi"
   }
 };
 export function ludoOption(language: Language, key: string): string {
