@@ -11,7 +11,8 @@ const labels: Record<Language, Record<string, string>> = {
     "humans": "People",
     "computers": "Computers",
     "start": "Play",
-    "options": "Game options"
+    "options": "Game options",
+    "music": "Music"
   },
   "am": {},
   "om": {}
