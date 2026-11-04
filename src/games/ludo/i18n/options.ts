@@ -33,7 +33,9 @@ const labels: Record<Language, Record<string, string>> = {
     "sixPlayers": "Six-player board",
     "fourPlayers": "Classic board"
   },
-  "am": {},
+  "am": {
+    "style": "የሰሌዳ ቅጥ"
+  },
   "om": {}
 };
 export function ludoOption(language: Language, key: string): string {
