@@ -67,7 +67,8 @@ const labels: Record<Language, Record<string, string>> = {
   },
   "om": {
     "style": "Bifa gabatee",
-    "classic": "Idilee"
+    "classic": "Idilee",
+    "jewel": "Faaya"
   }
 };
 export function ludoOption(language: Language, key: string): string {
