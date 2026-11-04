@@ -26,7 +26,8 @@ const labels: Record<Language, Record<string, string>> = {
     "roll": "Roll",
     "choose": "Tap a piece",
     "winning": "Winner",
-    "saved": "Progress saves automatically"
+    "saved": "Progress saves automatically",
+    "quick": "Quick match"
   },
   "am": {},
   "om": {}
