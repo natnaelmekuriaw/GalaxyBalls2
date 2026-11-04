@@ -62,7 +62,8 @@ const labels: Record<Language, Record<string, string>> = {
     "quick": "ፈጣን ጨዋታ",
     "volume": "ድምፅ",
     "local": "በዚህ መሣሪያ አብራችሁ ተጫወቱ",
-    "sixPlayers": "የስድስት ተጫዋች ሰሌዳ"
+    "sixPlayers": "የስድስት ተጫዋች ሰሌዳ",
+    "fourPlayers": "መደበኛ ሰሌዳ"
   },
   "om": {}
 };
