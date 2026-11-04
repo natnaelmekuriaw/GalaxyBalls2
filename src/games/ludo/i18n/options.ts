@@ -39,7 +39,8 @@ const labels: Record<Language, Record<string, string>> = {
     "jewel": "ዕንቁ",
     "garden": "አትክልት",
     "pastel": "ለስላሳ ቀለም",
-    "players": "ተጫዋቾች"
+    "players": "ተጫዋቾች",
+    "humans": "ሰዎች"
   },
   "om": {}
 };
