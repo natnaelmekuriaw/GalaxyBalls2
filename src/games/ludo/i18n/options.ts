@@ -28,7 +28,8 @@ const labels: Record<Language, Record<string, string>> = {
     "winning": "Winner",
     "saved": "Progress saves automatically",
     "quick": "Quick match",
-    "volume": "Audio"
+    "volume": "Audio",
+    "local": "Play together on this device"
   },
   "am": {},
   "om": {}
