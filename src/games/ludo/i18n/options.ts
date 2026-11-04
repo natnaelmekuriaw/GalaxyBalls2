@@ -54,7 +54,8 @@ const labels: Record<Language, Record<string, string>> = {
     "match": "የጨዋታ ዝግጅት",
     "close": "ዝጋ",
     "resume": "ቀጥል",
-    "newGame": "አዲስ ጨዋታ"
+    "newGame": "አዲስ ጨዋታ",
+    "roll": "ጣል"
   },
   "om": {}
 };
