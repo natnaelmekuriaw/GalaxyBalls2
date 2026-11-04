@@ -2,7 +2,7 @@
   <img src="assets/branding/galaxy-balls-title.png" width="360" alt="Galaxy Balls" />
 </p>
 
-<p align="center">Galaxy Balls and Snake — two arcade classics for mobile and web.</p>
+<p align="center">Galaxy Balls, Snake, and Ludo for mobile and web.</p>
 
 <p align="center">
   <a href="#how-to-play">How to play</a> ·
@@ -29,6 +29,10 @@ score chains, and catch golden bonuses while avoiding rocks and your trail.
 Choose Easy, Normal, or Fast; steer with arrows, swipes, or keyboard.
 Switch to an analog stick, enlarge the buttons, or move and lock the pad in **Controls**.
 [Controls & saves →](docs/snake.md)
+
+**Ludo** — race four pieces home against 1–3 computer opponents or play locally
+with 2–4 people. Roll, tap a glowing piece, and pass the device when the turn changes.
+[Rules & local matches →](docs/ludo.md)
 
 - **Languages:** English · አማርኛ · Afaan Oromoo
 - **Audio:** menu music and effects, with separate controls
@@ -57,9 +61,10 @@ For mobile development, run `npm start`.
 <details>
 <summary><strong>What gets saved?</strong></summary>
 
-Each game keeps its own unfinished run and scores on this device. Galaxy Balls
-keeps a top-five table; Snake keeps a best score for each garden and speed. Language and
-audio settings are shared. Reopen a game and choose **Resume** to continue.
+Each game keeps its own unfinished run on this device. Galaxy Balls keeps a
+top-five table; Snake keeps a best score for each garden and speed. Ludo saves
+the current match. Language and audio settings are shared. Reopen a game and
+choose **Resume** to continue.
 
 Starting another run asks before replacing a saved game. Clearing app or browser
 data removes local saves.

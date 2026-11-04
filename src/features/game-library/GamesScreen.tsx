@@ -17,8 +17,11 @@ function GameArtwork({ game, size }: { game: GameDefinition; size: number }) {
     contentFit="contain" accessible={false} />;
 
   return <View accessible={false} style={[styles.ludoIcon, { width: size, height: size, borderRadius: size * 0.2 }]}>
-    {['#F87272', '#62D5A5', '#F9CF70', '#73B9F3'].map(color =>
-      <View key={color} style={[styles.ludoCorner, { backgroundColor: color }]}><View style={styles.ludoToken} /></View>)}
+    {['#F87272', '#62D5A5', '#F9CF70', '#73B9F3'].map((color, index) =>
+      <View key={color} style={[styles.ludoCorner, { backgroundColor: color,
+        left: index % 2 === 0 ? '5%' : '53%', top: index < 2 ? '5%' : '53%' }]}>
+        <View style={styles.ludoToken} />
+      </View>)}
     <View style={styles.ludoCenter} />
   </View>;
 }
@@ -120,8 +123,8 @@ const styles = StyleSheet.create({
   openLabel: { color: '#1C1917', fontSize: 16, fontWeight: '900', textAlign: 'center' },
   backButton: { minHeight: 48, padding: 14, borderRadius: 12, borderColor: '#475569', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   backLabel: { color: '#F8FAFC', fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  ludoIcon: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, gap: 2, backgroundColor: '#F8FAFC', overflow: 'hidden' },
-  ludoCorner: { width: '48%', height: '48%', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  ludoIcon: { backgroundColor: '#F8FAFC', overflow: 'hidden' },
+  ludoCorner: { position: 'absolute', width: '42%', height: '42%', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   ludoToken: { width: '46%', height: '46%', borderRadius: 30, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#FFFFFF99' },
   ludoCenter: { position: 'absolute', width: '18%', height: '18%', left: '41%', top: '41%',
     backgroundColor: '#FFFFFF', borderRadius: 3, transform: [{ rotate: '45deg' }] },
