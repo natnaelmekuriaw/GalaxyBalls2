@@ -1,281 +1,215 @@
 import { router, useIsFocused } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { GameText as Text } from '@/shared/components/game-text';
 import { useLanguage } from '@/shared/i18n/LanguageProvider';
 import { LudoBoard } from './board/LudoBoard';
-import { COLORS } from './board/geometry';
-import { chooseComputerToken, createLudoGame, FINISH, legalTokens, moveLudoToken, rollLudo,
-  type LudoSetup } from './engine/ludoEngine';
+import { BOARD_THEMES, THEME_IDS } from './board/themes';
+import { chooseComputerToken, createLudoGame, finishFor, legalTokens, moveLudoToken, rollLudo, type LudoColor, type LudoSetup } from './engine/ludoEngine';
 import { translateLudo, type LudoTranslationKey } from './i18n/translations';
+import { ludoOption } from './i18n/options';
 import { useLudoMatch } from './data/useLudoMatch';
+import { useLudoPreferences } from './data/useLudoPreferences';
+import { useLudoAudio } from './audio/useLudoAudio';
+import { LudoCelebration } from './board/LudoCelebration';
 
-const MENU_PREVIEW = createLudoGame({ humans: 4, computers: 0 }, 1);
-const BOT_ACCENTS = [COLORS.yellow, COLORS.green, COLORS.blue];
-const LOCAL_ACCENTS = [COLORS.red, COLORS.green, COLORS.blue];
-
-function Die({ value, label }: { value: number | null; label: string }) {
-  const pips: Record<number, number[]> = { 1: [4], 2: [0, 8], 3: [0, 4, 8],
-    4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
-  return <View style={styles.die} accessibilityLabel={label}>
-    {value === null ? <Text style={styles.dieQuestion}>?</Text> : Array.from({ length: 9 }, (_, index) =>
-      <View key={index} style={[styles.pipSlot, pips[value].includes(index) && styles.pip]} />)}
-  </View>;
+const PIPS: Record<number, number[]> = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+function Die({ value }: { value: number | null }) {
+  return <View style={styles.die}>{value === null ? <Text style={styles.question}>✦</Text> : Array.from({ length: 9 }, (_, index) =>
+    <View key={index} style={[styles.pip, { opacity: PIPS[value].includes(index) ? 1 : 0 }]} />)}</View>;
 }
-
-function PrimaryButton({ children, onPress, secondary = false }: { children: string; onPress: () => void; secondary?: boolean }) {
-  return <Pressable accessibilityRole="button" onPress={onPress}
-    style={({ pressed }) => [styles.primaryButton, secondary && styles.secondaryButton, pressed && styles.pressed]}>
-    <Text style={[styles.primaryText, secondary && styles.secondaryText]}>{children}</Text>
-  </Pressable>;
+function Button({ text, onPress }: { text: string; onPress: () => void }) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.button, pressed && styles.pressed]}><Text style={styles.buttonText}>{text}</Text></Pressable>;
 }
-
 export default function LudoScreen() {
   const { language } = useLanguage();
-  const isFocused = useIsFocused();
   const tr = (key: LudoTranslationKey, values?: Record<string, string | number>) => translateLudo(language, key, values);
+  const label = (key: string) => ludoOption(language, key);
+  const name = (color: LudoColor) => color === 'purple' || color === 'orange' ? label(color) : tr(color);
+  const focused = useIsFocused();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
+  const landscape = width > height;
   const { game, setGame, ready, saveFailed } = useLudoMatch();
-  const [showMenu, setShowMenu] = useState(true);
-  const [pendingSetup, setPendingSetup] = useState<LudoSetup | null>(null);
-  const [rulesOpen, setRulesOpen] = useState(false);
+  const { preferences, setPreferences, ready: preferencesReady, failed } = useLudoPreferences();
+  const { play, unlock } = useLudoAudio(preferences.sound, preferences.music, focused);
+  const [menu, setMenu] = useState(true);
+  const [rules, setRules] = useState(false);
+  const [pending, setPending] = useState<LudoSetup | null>(null);
+  const [foreground, setForeground] = useState(true);
   const [rolling, setRolling] = useState(false);
-  const rollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [dieSpin] = useState(() => new Animated.Value(0));
-  const boardSize = Math.max(220, Math.floor(Math.min(width - 30, height - 290, 510)));
-
-  useEffect(() => () => { if (rollTimer.current) clearTimeout(rollTimer.current); }, []);
+  const [rollFace, setRollFace] = useState(1);
+  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const previous = useRef(game);
+  const palette = BOARD_THEMES[preferences.theme];
+  const available = ready && preferencesReady;
+  const size = Math.max(180, Math.floor(Math.min(landscape ? width - 220 : width - 12,
+    height - insets.top - insets.bottom - (landscape ? 64 : 224), 650)));
   useEffect(() => {
-    if (isFocused && !showMenu) return;
-    if (rollTimer.current) clearTimeout(rollTimer.current);
-    rollTimer.current = null;
-    dieSpin.stopAnimation(() => setRolling(false));
-  }, [isFocused, showMenu, dieSpin]);
-
+    const listener = AppState.addEventListener('change', state => setForeground(state === 'active'));
+    return () => listener.remove();
+  }, []);
+  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
   useEffect(() => {
-    if (!isFocused || showMenu || !game || game.phase === 'finished' || game.seats[game.turn].kind !== 'computer') return;
-    const timer = setTimeout(() => setGame(current => {
-      if (current !== game) return current;
-      return current.phase === 'roll' ? rollLudo(current)
-        : moveLudoToken(current, chooseComputerToken(current) ?? -1);
-    }), 500);
-    return () => clearTimeout(timer);
-  }, [game, showMenu, isFocused, setGame]);
-
-  const start = (setup: LudoSetup) => {
-    setGame(createLudoGame(setup));
-    setPendingSetup(null);
-    setShowMenu(false);
-  };
+    if (focused && foreground && !menu) return;
+    if (timer.current) clearInterval(timer.current);
+    const reset = setTimeout(() => setRolling(false), 0);
+    return () => clearTimeout(reset);
+  }, [focused, foreground, menu]);
+  useEffect(() => {
+    const old = previous.current;
+    previous.current = game;
+    if (!game || !old || old === game || menu) return;
+    if (game.event === 'capture' || game.event === 'home' || game.event === 'win') play(game.event);
+    else if (old.seats !== game.seats) play('move');
+    else if (old.seed !== game.seed && old.seats[old.turn].kind === 'computer') play('roll');
+  }, [game, menu, play]);
+  useEffect(() => {
+    if (!game || menu || !focused || !foreground || game.phase === 'finished' || game.seats[game.turn].kind !== 'computer') return;
+    const timeout = setTimeout(() => setGame(current => current !== game ? current : current.phase === 'roll'
+      ? rollLudo(current) : moveLudoToken(current, chooseComputerToken(current) ?? -1)), 700);
+    return () => clearTimeout(timeout);
+  }, [game, menu, focused, foreground, setGame]);
   const roll = () => {
-    if (rolling || !game || game.phase !== 'roll' || game.seats[game.turn].kind !== 'human') return;
-    setRolling(true);
-    dieSpin.setValue(0);
-    Animated.timing(dieSpin, { toValue: 1, duration: 420, useNativeDriver: true }).start();
-    rollTimer.current = setTimeout(() => {
-      setGame(current => current ? rollLudo(current) : current);
-      setRolling(false);
-      rollTimer.current = null;
-      dieSpin.setValue(0);
-    }, 420);
+    if (!game || rolling || game.phase !== 'roll' || game.seats[game.turn].kind !== 'human') return;
+    unlock(); play('roll'); setRolling(true);
+    let ticks = 0;
+    timer.current = setInterval(() => {
+      setRollFace(face => face % 6 + 1);
+      if (++ticks >= 6) {
+        if (timer.current) clearInterval(timer.current);
+        setGame(current => current === game ? rollLudo(current) : current); setRolling(false);
+      }
+    }, 70);
   };
-  const requestStart = (setup: LudoSetup) => {
-    if (game && game.phase !== 'finished') setPendingSetup(setup);
-    else start(setup);
+  const move = (index: number) => { unlock(); setGame(current => current ? moveLudoToken(current, index) : current); };
+  const start = (setup: LudoSetup) => { unlock(); play('start'); setGame(createLudoGame(setup)); setPending(null); setRolling(false); setMenu(false); };
+  const requestStart = () => {
+    const setup = { humans: preferences.humans, computers: preferences.computers };
+    unlock(); play('tap');
+    if (game && game.phase !== 'finished') setPending(setup); else start(setup);
   };
   const active = game?.seats[game.turn];
-  const legal = game ? legalTokens(game) : [];
-  const colorName = (color: NonNullable<typeof active>['color']) => tr(color);
-  const eventText = game?.event === 'capture' || game?.event === 'home' || game?.event === 'noMove' || game?.event === 'threeSixes'
-    ? tr(game.event) : null;
-
-  return <View style={styles.screen}>
-    <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 18 }]}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel={showMenu ? tr('backToGames') : tr('menu')}
-          onPress={() => showMenu ? router.navigate('/explore') : setShowMenu(true)} style={styles.backButton}>
-          <Text style={styles.backGlyph}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text accessibilityRole="header" style={styles.title}>{tr('title')}</Text>
-          {showMenu && <Text style={styles.subtitle}>{tr('subtitle')}</Text>}
+  const legal = game && game.seats[game.turn].kind === 'human' ? legalTokens(game) : [];
+  const preview = createLudoGame({ humans: 4, computers: 0 }, 1);
+  const changeCount = (key: 'humans' | 'computers', value: number) => {
+    unlock(); play('tap'); setPreferences(current => {
+      const next = { ...current, [key]: value };
+      return next.humans >= 1 && next.computers >= 0 && next.humans + next.computers >= 2 && next.humans + next.computers <= 6 ? next : current;
+    });
+  };
+  const seat = (color: LudoColor) => {
+    if (!game) return null;
+    const index = game.seats.findIndex(player => player.color === color);
+    if (index < 0) return <View key={color} style={{ flex: 1, maxWidth: 230 }} />;
+    const player = game.seats[index];
+    const current = game.turn === index;
+    const canRoll = current && player.kind === 'human' && game.phase === 'roll' && !rolling;
+    return <Pressable key={color} accessibilityRole="button" accessibilityLabel={`${name(color)}: ${tr('roll')}`}
+      accessibilityState={{ disabled: !canRoll }} disabled={!canRoll} onPress={roll}
+      style={({ pressed }) => [styles.seat, { borderColor: current ? palette.colors[color] : '#FFFFFF25', backgroundColor: current ? '#FFFFFF15' : '#00000025' }, pressed && styles.pressed]}>
+      <View style={[styles.playerDot, { backgroundColor: palette.colors[color] }]} />
+      <View style={[styles.seatCopy, landscape && { display: 'none' }]}><Text numberOfLines={1} style={styles.seatName}>{name(color)}</Text>
+        <Text style={styles.seatHint}>{player.kind === 'computer' ? tr('computer') : tr('player')} · {player.tokens.filter(p => p === finishFor(game)).length}/4</Text></View>
+      <Die value={current && rolling ? rollFace : game.rolls?.[color] ?? (current ? game.die : null)} />
+    </Pressable>;
+  };
+  const six = game && game.seats.length > 4;
+  return <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={styles.header}>
+      <Pressable accessibilityRole="button" accessibilityLabel={tr('backToGames')} onPress={() => router.navigate('/explore')} style={styles.iconButton}><Text style={styles.iconText}>‹</Text></Pressable>
+      <Text style={styles.title}>{tr('title')}</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={label('options')} onPress={() => { unlock(); play('tap'); setRolling(false); if (game) setMenu(open => !open); }} style={styles.iconButton}><Text style={styles.iconText}>☰</Text></Pressable>
+    </View>
+    {menu ? <ScrollView pointerEvents={available ? 'auto' : 'none'} contentContainerStyle={styles.menuContent}>
+      {!available && <Text style={styles.hint}>{tr('loading')}</Text>}
+      <View style={styles.menuHero}><View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <LudoBoard game={preview} size={132} legal={[]} boardLabel={tr('board')} onMove={() => undefined} tokenLabel={() => ''} theme={preferences.theme} />
+      </View><View style={styles.heroCopy}><Text style={styles.heroTitle}>{tr('title')}</Text><Text style={styles.heroHint}>{tr('subtitle')}</Text>
+        {available && game && <Button onPress={() => { unlock(); setMenu(false); }} text={label('resume')} />}</View></View>
+      <Text style={styles.sectionTitle}>{label('match')}</Text>
+      <View style={styles.setupRow}>{(['humans', 'computers'] as const).map(key => <View key={key} style={styles.counter}>
+        <Text style={styles.counterLabel}>{label(key)}</Text><View style={styles.counterControls}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`− ${label(key)}`} onPress={() => changeCount(key, preferences[key] - 1)} style={styles.countButton}><Text style={styles.countText}>−</Text></Pressable>
+          <Text style={styles.countValue}>{preferences[key]}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`+ ${label(key)}`} onPress={() => changeCount(key, preferences[key] + 1)} style={styles.countButton}><Text style={styles.countText}>+</Text></Pressable>
+        </View></View>)}</View>
+      <Text style={styles.hint}>{label(preferences.humans + preferences.computers > 4 ? 'sixPlayers' : 'fourPlayers')} · {label('local')}</Text>
+      {available && <Button onPress={requestStart} text={label('start')} />}
+      <Text style={styles.sectionTitle}>{label('style')}</Text>
+      <View style={styles.themeRow}>{THEME_IDS.map(id => <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: preferences.theme === id }}
+        accessibilityLabel={label(id)} onPress={() => { unlock(); play('tap'); setPreferences(current => ({ ...current, theme: id })); }}
+        style={[styles.themeCard, { borderColor: preferences.theme === id ? '#FFD56D' : '#FFFFFF30', backgroundColor: BOARD_THEMES[id].paper }]}>
+        <View style={styles.swatches}>{Object.values(BOARD_THEMES[id].colors).slice(0, 4).map(color => <View key={color} style={[styles.swatch, { backgroundColor: color }]} />)}</View>
+        <Text style={[styles.themeName, { color: BOARD_THEMES[id].ink }]}>{label(id)}</Text>
+      </Pressable>)}</View>
+      <View style={styles.audioRow}>{(['music', 'sound'] as const).map(key => <Pressable key={key} accessibilityRole="switch" accessibilityState={{ checked: preferences[key] }}
+        onPress={() => { unlock(); setPreferences(current => ({ ...current, [key]: !current[key] })); }} style={styles.audioButton}>
+        <Text style={styles.audioText}>{label(key)}</Text><Text style={{ color: preferences[key] ? '#7EE2BA' : '#A6AFC1', fontWeight: '900' }}>{label(preferences[key] ? 'on' : 'off')}</Text>
+      </Pressable>)}</View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: rules }} onPress={() => setRules(open => !open)} style={styles.rulesButton}><Text style={styles.hint}>{tr('rules')} {rules ? '⌃' : '⌄'}</Text></Pressable>
+      {rules && <Text style={styles.rulesText}>{tr('rulesBody')}</Text>}
+      <Text style={styles.saved}>{label('saved')}</Text>
+    </ScrollView> : game && active && <View style={[styles.playArea, landscape && styles.landscape]}>
+      <View style={[styles.table, landscape && { width: size + 12 }]}>
+        {!landscape && <View style={styles.seatRow}>{(six ? ['red', 'green', 'yellow'] : ['red', 'green']).map(color => seat(color as LudoColor))}</View>}
+        <View>
+          <LudoBoard game={game} size={size} legal={legal} boardLabel={tr('board')} onMove={move} theme={preferences.theme}
+            tokenLabel={(color, index) => tr('token', { color: name(color), number: index + 1 })} />
+          <LudoCelebration event={game.event} revision={game.seed} color={palette.colors[active.color]} />
         </View>
-        {!showMenu && <Pressable accessibilityRole="button" accessibilityLabel={tr('menu')} onPress={() => setShowMenu(true)} style={styles.headerMenu}>
-          <Text style={styles.headerMenuText}>☰</Text>
-        </Pressable>}
+        {!landscape && <View style={styles.seatRow}>{(six ? ['blue', 'purple', 'orange'] : ['blue', 'yellow']).map(color => seat(color as LudoColor))}</View>}
       </View>
-
-      {showMenu ? <View style={styles.menu}>
-        <View style={styles.hero}>
-          <View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={styles.heroBoard}>
-            <LudoBoard game={MENU_PREVIEW} size={136} legal={[]} boardLabel={tr('board')}
-              onMove={() => undefined} tokenLabel={(color, index) => tr('token', { color: colorName(color), number: index + 1 })} />
-          </View>
-          <View style={styles.heroCopy}>
-            <Text style={styles.heroTitle}>{tr('chooseMatch')}</Text>
-            <Text style={styles.heroHint}>{tr('subtitle')}</Text>
-            <View style={styles.heroTokens}>{(['red', 'green', 'yellow', 'blue'] as const).map(color =>
-              <View key={color} style={[styles.heroToken, { backgroundColor: COLORS[color] }]} />)}</View>
-          </View>
-        </View>
-        {!ready && <Text style={styles.rulesBody}>{tr('loading')}</Text>}
-        {ready && game && game.phase !== 'finished' && <PrimaryButton onPress={() => setShowMenu(false)}>{tr('resume')}</PrimaryButton>}
-        {ready && <>
-        <Text style={styles.sectionTitle}>{tr('computerMatches')}</Text>
-        <View style={styles.presets}>{[1, 2, 3].map(count =>
-          <Pressable key={`bot-${count}`} accessibilityRole="button" onPress={() => requestStart({ humans: 1, computers: count })}
-            style={({ pressed }) => [styles.preset, { borderLeftColor: BOT_ACCENTS[count - 1] }, pressed && styles.pressed]}>
-            <View style={[styles.presetBadge, { backgroundColor: '#F8CE79' }]}><Text style={styles.presetBadgeText}>{count}</Text></View>
-            <Text style={styles.presetText}>{tr('vsBots', { count })}</Text><Text style={styles.presetArrow}>›</Text>
-          </Pressable>)}</View>
-        <Text style={styles.sectionTitle}>{tr('localMatches')}</Text>
-        <View style={styles.presets}>{[2, 3, 4].map(count =>
-          <Pressable key={`local-${count}`} accessibilityRole="button" onPress={() => requestStart({ humans: count, computers: 0 })}
-            style={({ pressed }) => [styles.preset, { borderLeftColor: LOCAL_ACCENTS[count - 2] }, pressed && styles.pressed]}>
-            <View style={[styles.presetBadge, { backgroundColor: '#75D4AF' }]}><Text style={styles.presetBadgeText}>{count}</Text></View>
-            <Text style={styles.presetText}>{tr('localPlayers', { count })}</Text><Text style={styles.presetArrow}>›</Text>
-          </Pressable>)}</View>
-        </>}
-        {saveFailed && <Text accessibilityRole="alert" style={styles.saveError}>{tr('saveFailed')}</Text>}
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: rulesOpen }} onPress={() => setRulesOpen(open => !open)} style={styles.rulesToggle}>
-          <Text style={styles.rulesTitle}>{tr('rules')} {rulesOpen ? '⌃' : '⌄'}</Text>
-        </Pressable>
-        {rulesOpen && <Text style={styles.rulesBody}>{tr('rulesBody')}</Text>}
-      </View> : game && active && <View style={styles.game}>
-        <View style={styles.turnCard}>
-          <View style={[styles.turnEmblem, { backgroundColor: COLORS[active.color] }]}>
-            <View style={styles.turnEmblemDot} />
-          </View>
-          <View style={styles.turnCopy}><Text style={[styles.turnTitle, { color: COLORS[active.color] }]}>{game.winner ? tr('win', { color: colorName(game.winner) })
-            : tr('turn', { color: colorName(active.color) })}</Text>
-            <Text style={styles.turnHint}>{game.winner ? tr('playAgain') : active.kind === 'computer' ? tr('waitingComputer')
-              : game.phase === 'choose' ? tr('chooseToken') : game.event === 'capture' || game.event === 'home' || game.lastRoll === 6 && game.sixes > 0
-                ? tr('rollAgain') : tr('roll')}</Text>
-          </View>
-          <View style={styles.turnCount}><Text style={styles.turnCountText}>{tr('homeCount', { count: active.tokens.filter(progress => progress === FINISH).length })}</Text></View>
-        </View>
-        <View style={styles.boardFrame}>
-          <LudoBoard game={game} size={boardSize} legal={legal} boardLabel={tr('board')} onMove={index => setGame(current => current ? moveLudoToken(current, index) : current)}
-            tokenLabel={(color, index) => tr('token', { color: colorName(color), number: index + 1 })} />
-        </View>
-        <View style={styles.actionArea}>
-          {game.phase === 'finished' ? <PrimaryButton onPress={() => setShowMenu(true)}>{tr('playAgain')}</PrimaryButton>
-            : active.kind === 'human' && game.phase === 'roll' ? <Pressable accessibilityRole="button" accessibilityLabel={tr('roll')}
-                accessibilityState={{ disabled: rolling }} disabled={rolling} onPress={roll}
-                style={({ pressed }) => [styles.rollButton, pressed && styles.pressed]}>
-                <Animated.View style={{ transform: [{ rotate: dieSpin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '720deg'] }) }] }}>
-                  <Die value={rolling ? null : game.die ?? game.lastRoll} label={tr('dieValue', { value: game.die ?? game.lastRoll ?? '—' })} />
-                </Animated.View>
-                <Text style={styles.rollLabel}>{tr('roll')}</Text><Text style={styles.rollArrow}>›</Text>
-              </Pressable>
-              : active.kind === 'human' && game.phase === 'choose' ? <View style={styles.choices}>
-              <Die value={game.die} label={tr('dieValue', { value: game.die ?? '—' })} />
-              {legal.map(index => <Pressable key={index} accessibilityRole="button"
-                accessibilityLabel={tr('token', { color: colorName(active.color), number: index + 1 })}
-                onPress={() => setGame(current => current ? moveLudoToken(current, index) : current)} style={styles.choice}>
-                <View style={[styles.choiceDot, { backgroundColor: COLORS[active.color] }]} />
-                <Text style={styles.choiceText}>{index + 1}</Text>
-              </Pressable>)}
-              </View> : <View style={styles.waiting}><Die value={game.die ?? game.lastRoll} label={tr('dieValue', { value: game.die ?? game.lastRoll ?? '—' })} />
-                <Text style={styles.waitingText}>{tr('waitingComputer')}</Text></View>}
-          {eventText && <Text accessibilityLiveRegion="polite" style={styles.eventText}>{eventText}</Text>}
-        </View>
-        <View style={styles.seats}>{game.seats.map((seat, index) =>
-          <View key={seat.color} style={[styles.seat, index === game.turn && styles.activeSeat, { borderColor: index === game.turn ? COLORS[seat.color] : '#465269' }]}>
-            <View style={[styles.seatDot, { backgroundColor: COLORS[seat.color] }]} />
-            <View style={styles.seatCopy}>
-              <Text numberOfLines={1} style={styles.seatName}>{colorName(seat.color)} · {tr(seat.kind === 'computer' ? 'computer' : 'player')}</Text>
-              <Text style={styles.seatProgress}>{tr('homeCount', { count: seat.tokens.filter(progress => progress === FINISH).length })}</Text>
-            </View>
-          </View>)}</View>
-        {saveFailed && <Text accessibilityRole="alert" style={styles.saveError}>{tr('saveFailed')}</Text>}
-      </View>}
-    </ScrollView>
-    {pendingSetup && <View style={styles.modalLayer}>
-      <View style={styles.modalCard}>
-        <Text style={styles.modalTitle}>{tr('replaceTitle')}</Text>
-        <Text style={styles.modalBody}>{tr('replaceMessage')}</Text>
-        <PrimaryButton onPress={() => start(pendingSetup)}>{tr('confirm')}</PrimaryButton>
-        <PrimaryButton secondary onPress={() => setPendingSetup(null)}>{tr('cancel')}</PrimaryButton>
+      <View style={[styles.actions, landscape && styles.landscapeActions]}>
+        {landscape && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>{game.seats.map(player => <View key={player.color} style={{ width: '46%' }}>{seat(player.color)}</View>)}</View>}
+        <Text accessibilityLiveRegion="polite" style={[styles.turnText, { color: palette.colors[active.color] }]}>{game.winner ? tr('win', { color: name(game.winner) }) : tr('turn', { color: name(active.color) })}</Text>
+        <Text style={styles.hint}>{active.kind === 'computer' ? tr('waitingComputer') : game.phase === 'choose' ? label('choose') : tr('roll')}</Text>
+        {game.phase === 'choose' && active.kind === 'human' && <View style={styles.choices}>{legal.map(index => <Pressable key={index} accessibilityRole="button"
+          accessibilityLabel={tr('token', { color: name(active.color), number: index + 1 })} onPress={() => move(index)} style={[styles.choice, { backgroundColor: palette.colors[active.color] }]}><Text style={styles.choiceText}>{index + 1}</Text></Pressable>)}</View>}
+        {(game.event === 'capture' || game.event === 'home' || game.event === 'threeSixes' || game.event === 'noMove') && <Text style={styles.event}>{tr(game.event)}</Text>}
+        {game.winner && <Button onPress={() => setMenu(true)} text={tr('playAgain')} />}
       </View>
     </View>}
+    {(saveFailed || failed) && <Text accessibilityRole="alert" style={styles.error}>{tr('saveFailed')}</Text>}
+    {pending && <View style={styles.modalLayer}><View style={styles.modalCard}><Text style={styles.sectionTitle}>{tr('replaceTitle')}</Text>
+      <Text style={styles.rulesText}>{tr('replaceMessage')}</Text><Button onPress={() => start(pending)} text={tr('confirm')} />
+      <Button onPress={() => setPending(null)} text={tr('cancel')} /></View></View>}
   </View>;
 }
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#101B2E' },
-  content: { alignItems: 'center', paddingHorizontal: 10, gap: 9 },
-  header: { width: '100%', maxWidth: 560, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#25354E', alignItems: 'center', justifyContent: 'center' },
-  backGlyph: { color: '#F7E9BA', fontSize: 34, lineHeight: 38 },
-  headerCopy: { flex: 1 }, title: { color: '#FFF1CC', fontSize: 23, fontWeight: '900' },
-  subtitle: { color: '#91A4C3', fontSize: 12 },
-  headerMenu: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#25354E', alignItems: 'center', justifyContent: 'center' },
-  headerMenuText: { color: '#F7E9BA', fontSize: 22 },
-  menu: { width: '100%', maxWidth: 560, gap: 14 },
-  hero: { minHeight: 166, backgroundColor: '#2B3E58', borderRadius: 23, padding: 12, flexDirection: 'row',
-    justifyContent: 'center', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: '#5B708E' },
-  heroBoard: { width: 136, height: 136 }, heroCopy: { flex: 1, gap: 9 },
-  heroTokens: { flexDirection: 'row', gap: 6, marginTop: 5 },
-  heroToken: { width: 19, height: 19, borderRadius: 10, borderWidth: 2, borderColor: '#FFFFFF' },
-  heroTitle: { color: '#FFF2D7', fontSize: 23, fontWeight: '900', lineHeight: 27 },
-  heroHint: { color: '#D4DFEE', fontSize: 13, lineHeight: 17 },
-  sectionTitle: { color: '#F7E9BA', fontSize: 15, fontWeight: '900', marginTop: 4 },
-  presets: { gap: 8 },
-  preset: { minHeight: 56, paddingHorizontal: 12, borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 11,
-    backgroundColor: '#263851', borderWidth: 1, borderLeftWidth: 5, borderColor: '#4B617D' },
-  presetBadge: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: '#FFFFFFC0' },
-  presetBadgeText: { color: '#263149', fontWeight: '900', fontSize: 17 },
-  presetText: { flex: 1, color: '#F7F9FC', fontSize: 15, fontWeight: '700' },
-  presetArrow: { color: '#F7CF78', fontSize: 27 },
-  rulesToggle: { minHeight: 44, justifyContent: 'center' }, rulesTitle: { color: '#F7E9BA', fontSize: 14, fontWeight: '800' },
-  rulesBody: { color: '#C1CEE0', fontSize: 13, lineHeight: 21, paddingBottom: 10 },
-  game: { width: '100%', maxWidth: 560, gap: 9 },
-  seats: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
-  seat: { width: '49%', minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 8,
-    backgroundColor: '#1B2B42', borderWidth: 1, borderRadius: 12 },
-  activeSeat: { backgroundColor: '#293951' },
-  seatDot: { width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderColor: '#FFFFFF99' }, seatCopy: { flex: 1, minWidth: 0 },
-  seatName: { color: '#F7F9FC', fontSize: 11, fontWeight: '800' }, seatProgress: { color: '#AABAD2', fontSize: 10 },
-  turnCard: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 11,
-    backgroundColor: '#243650', borderRadius: 18, borderWidth: 1, borderColor: '#516580' },
-  turnEmblem: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: '#FFFFFF', shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 4, elevation: 3 },
-  turnEmblemDot: { width: 17, height: 17, borderRadius: 9, backgroundColor: '#FFFFFFBB' },
-  turnCopy: { flex: 1 }, turnTitle: { fontSize: 17, fontWeight: '900' },
-  turnHint: { color: '#E3EAF3', fontSize: 12, marginTop: 2 },
-  turnCount: { backgroundColor: '#152237', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7 },
-  turnCountText: { color: '#E6E9EF', fontWeight: '700', fontSize: 11 },
-  boardFrame: { alignSelf: 'center', padding: 5, borderRadius: 19, backgroundColor: '#C69255',
-    borderWidth: 3, borderColor: '#E4B982', shadowColor: '#000000', shadowOpacity: 0.36,
-    shadowOffset: { width: 0, height: 7 }, shadowRadius: 12, elevation: 8 },
-  die: { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F7F2E7', flexDirection: 'row', flexWrap: 'wrap', padding: 7,
-    justifyContent: 'space-between', alignContent: 'space-between', shadowColor: '#000000', shadowOpacity: 0.4, shadowRadius: 5, elevation: 3 },
-  pipSlot: { width: 7, height: 7, borderRadius: 4 }, pip: { backgroundColor: '#1C2C44' },
-  dieQuestion: { color: '#1C2C44', fontSize: 24, fontWeight: '900', alignSelf: 'center', textAlign: 'center', width: '100%' },
-  actionArea: { minHeight: 59, gap: 4 },
-  rollButton: { minHeight: 59, flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 17,
-    backgroundColor: '#F8CE79', borderWidth: 2, borderColor: '#FFE2A0', paddingHorizontal: 11,
-    shadowColor: '#000000', shadowOpacity: 0.24, shadowOffset: { width: 0, height: 4 }, shadowRadius: 7, elevation: 4 },
-  rollLabel: { flex: 1, color: '#273149', fontSize: 18, fontWeight: '900' },
-  rollArrow: { color: '#273149', fontSize: 33, fontWeight: '900', lineHeight: 38 },
-  waiting: { minHeight: 59, borderRadius: 16, backgroundColor: '#25364E', flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 12 },
-  waitingText: { color: '#F8ECD0', fontWeight: '800', fontSize: 13 },
-  eventText: { color: '#F7CF78', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  saveError: { color: '#FDA4AF', fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  primaryButton: { minHeight: 52, borderRadius: 16, paddingHorizontal: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#F7CF78' }, primaryText: { color: '#17243B', fontSize: 16, fontWeight: '900', textAlign: 'center' },
-  secondaryButton: { backgroundColor: '#24334D' }, secondaryText: { color: '#FFFFFF' }, pressed: { opacity: 0.75 },
-  choices: { minHeight: 59, flexDirection: 'row', justifyContent: 'center', gap: 10, paddingBottom: 4 },
-  choice: { width: 58, height: 58, borderRadius: 17, backgroundColor: '#34455D', borderWidth: 2, borderColor: '#FFDB83',
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  choiceDot: { width: 17, height: 17, borderRadius: 9, borderWidth: 2, borderColor: '#FFFFFF' },
-  choiceText: { color: '#FFFFFF', fontWeight: '900' },
-  modalLayer: { ...StyleSheet.absoluteFill, backgroundColor: '#030712DD', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  modalCard: { width: '100%', maxWidth: 390, backgroundColor: '#17243B', borderRadius: 22, padding: 22, gap: 14 },
-  modalTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900' }, modalBody: { color: '#C1CEE0', fontSize: 14, lineHeight: 21 },
+  screen: { flex: 1, backgroundColor: '#112D2B' },
+  header: { height: 48, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title: { color: '#FFE6A3', fontSize: 23, fontWeight: '900', letterSpacing: 3 },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }, iconText: { color: '#FFEDB7', fontSize: 28 },
+  menuContent: { width: '100%', maxWidth: 580, alignSelf: 'center', padding: 16, gap: 12 },
+  menuHero: { flexDirection: 'row', alignItems: 'center', gap: 20, paddingVertical: 8 },
+  heroCopy: { flex: 1, gap: 12 }, heroTitle: { color: '#FFDF84', fontSize: 38, fontWeight: '900' }, heroHint: { color: '#CCE0D5', fontSize: 14 },
+  sectionTitle: { color: '#FFE6A3', fontWeight: '900', fontSize: 18, marginTop: 4 },
+  setupRow: { flexDirection: 'row', gap: 12 }, counter: { flex: 1, gap: 8 }, counterLabel: { color: '#D7E5D6', fontSize: 13, fontWeight: '700' },
+  counterControls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#061B1B66', borderRadius: 30, padding: 3 },
+  countButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#385A4C', alignItems: 'center', justifyContent: 'center' },
+  countText: { color: '#FFE6A3', fontSize: 25, fontWeight: '900' }, countValue: { color: '#FFFFFF', fontSize: 24, fontWeight: '900' },
+  hint: { color: '#CEDDD1', fontSize: 12, textAlign: 'center' },
+  themeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  themeCard: { width: '48%', minHeight: 70, borderRadius: 12, borderWidth: 3, padding: 8, gap: 5, alignItems: 'center' },
+  swatches: { flexDirection: 'row', gap: 6 }, swatch: { width: 24, height: 24, borderRadius: 12 }, themeName: { fontSize: 13, fontWeight: '900' },
+  audioRow: { flexDirection: 'row', gap: 8 }, audioButton: { flex: 1, padding: 12, backgroundColor: '#21453D', borderRadius: 18, gap: 8 },
+  audioText: { color: '#FFF0BD', fontSize: 13, fontWeight: '700' }, rulesButton: { minHeight: 44, justifyContent: 'center' },
+  rulesText: { color: '#DFE8D9', fontSize: 13, lineHeight: 21 }, saved: { color: '#95B9A8', fontSize: 11, textAlign: 'center' },
+  playArea: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 8, gap: 8 }, landscape: { flexDirection: 'row', justifyContent: 'center' },
+  table: { alignItems: 'center', gap: 6, width: '100%' }, seatRow: { width: '100%', maxWidth: 650, flexDirection: 'row', justifyContent: 'space-between', gap: 6, paddingHorizontal: 6 },
+  seat: { flex: 1, minHeight: 52, maxWidth: 230, flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 2, borderRadius: 10, padding: 4 },
+  seatCopy: { flex: 1, minWidth: 0 }, seatName: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' }, seatHint: { color: '#C2D3C9', fontSize: 9 },
+  playerDot: { width: 9, height: 9, borderRadius: 5 },
+  actions: { width: '100%', maxWidth: 600, minHeight: 78, gap: 4, paddingHorizontal: 12, alignItems: 'center' }, landscapeActions: { width: 190 },
+  turnText: { fontSize: 17, fontWeight: '900', textAlign: 'center', textShadowColor: '#000000', textShadowRadius: 2 },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 }, choice: { width: 46, height: 46, borderWidth: 2, borderColor: '#FFE39E', borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  choiceText: { color: '#111111', fontWeight: '900', fontSize: 18 }, event: { color: '#FFE6A3', fontWeight: '700', fontSize: 12, textAlign: 'center' },
+  die: { width: 38, height: 38, borderRadius: 7, backgroundColor: '#FFFBED', flexDirection: 'row', flexWrap: 'wrap', padding: 6, justifyContent: 'space-between', alignContent: 'space-between' },
+  pip: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#172B2B' }, question: { color: '#304B41', fontSize: 21, fontWeight: '900', textAlign: 'center', width: '100%', lineHeight: 25 },
+  button: { minHeight: 48, backgroundColor: '#F7C963', borderRadius: 25, borderWidth: 2, borderColor: '#FFE5A2', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  buttonText: { color: '#253A2E', fontSize: 17, fontWeight: '900' }, pressed: { opacity: 0.7 },
+  error: { color: '#FFD1CA', fontSize: 12, textAlign: 'center' }, modalLayer: { ...StyleSheet.absoluteFill, backgroundColor: '#031411EE', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalCard: { width: '100%', maxWidth: 400, padding: 24, borderRadius: 22, backgroundColor: '#254E42', borderWidth: 2, borderColor: '#D7B263', gap: 16 },
 });
